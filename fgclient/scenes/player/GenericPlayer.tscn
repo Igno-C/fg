@@ -1,0 +1,28 @@
+[gd_scene load_steps=3 format=3 uid="uid://cer8wmyj2m1t0"]
+
+[ext_resource type="Script" uid="uid://c2y63wnw7regn" path="res://scripts/player/player_entity.gd" id="1_vafwm"]
+[ext_resource type="Texture2D" uid="uid://bdww048c0prbe" path="res://graphics/entities/debugplayer.png" id="2_gth5n"]
+
+[node name="GenericPlayer" type="Node2D"]
+script = ExtResource("1_vafwm")
+
+[node name="NameLabel" type="Label" parent="."]
+z_index = 1
+offset_left = -15.0
+offset_top = -12.0
+offset_right = 65.0
+offset_bottom = 13.0
+grow_horizontal = 2
+grow_vertical = 2
+pivot_offset = Vector2(40, 12)
+size_flags_horizontal = 3
+
+[node name="DebugLabel" type="Label" parent="."]
+offset_top = 12.0
+offset_right = 49.0
+offset_bottom = 50.0
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+z_index = 1
+texture = ExtResource("2_gth5n")
+centered = false

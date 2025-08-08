@@ -1,0 +1,13 @@
+[package]
+name = "rgdext_shared"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+# crate-type = ["cdylib", "lib"]  # Compile this crate to a dynamic C library and a rust library.
+crate-type = ["lib"]
+
+[dependencies]
+godot = {workspace = true}
+# serde = {version = "1.0", features = ["derive"]}
+bitcode = "0.6.6"

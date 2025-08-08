@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://bhtksi67opjbv"]
+
+[node name="TheUserAdditions" type="Node2D"]
+z_index = 1
+
+[node name="Camera2D" type="Camera2D" parent="."]

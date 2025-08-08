@@ -1,0 +1,6 @@
+[workspace]
+members = ["rgdext", "rgdext_shared", "rgdext_serverutil", "rgdext_client"]
+resolver = "2"
+
+[workspace.dependencies]
+godot = "0.3.4"

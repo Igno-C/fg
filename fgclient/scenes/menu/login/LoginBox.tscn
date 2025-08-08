@@ -1,0 +1,83 @@
+[gd_scene load_steps=2 format=3 uid="uid://dwityesu3grf6"]
+
+[ext_resource type="Script" uid="uid://drx4sljd1sgn1" path="res://scripts/menu/login/login_box.gd" id="1_l4mh6"]
+
+[node name="LoginBox" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_l4mh6")
+
+[node name="LoginBox" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -210.0
+offset_top = -116.0
+offset_right = 210.0
+offset_bottom = 284.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.18359, 0.18359, 0.18359, 1)
+
+[node name="Margin" type="MarginContainer" parent="LoginBox"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 25
+theme_override_constants/margin_top = 25
+theme_override_constants/margin_right = 25
+theme_override_constants/margin_bottom = 25
+
+[node name="VBox" type="VBoxContainer" parent="LoginBox/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 23
+alignment = 1
+
+[node name="LoginLabel" type="Label" parent="LoginBox/Margin/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 40
+text = "Log in"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="UsernameEdit" type="LineEdit" parent="LoginBox/Margin/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+placeholder_text = "Username"
+
+[node name="PasswordEdit" type="LineEdit" parent="LoginBox/Margin/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+placeholder_text = "Password"
+secret = true
+
+[node name="LoginButton" type="Button" parent="LoginBox/Margin/VBox"]
+custom_minimum_size = Vector2(130, 60)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+theme_override_font_sizes/font_size = 25
+text = "Login"
+
+[node name="CreationButton" type="LinkButton" parent="LoginBox/Margin/VBox"]
+layout_mode = 2
+text = "Create new account"
+
+[node name="ErrorLabel" type="Label" parent="LoginBox/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0, 0, 1)
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[connection signal="pressed" from="LoginBox/Margin/VBox/LoginButton" to="." method="_on_button_pressed"]
+[connection signal="pressed" from="LoginBox/Margin/VBox/CreationButton" to="." method="_on_creation_button_pressed"]

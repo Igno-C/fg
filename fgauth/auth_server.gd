@@ -1,0 +1,111 @@
+extends ServerConnector
+
+const db_path: String = "res://data/authdb.db"
+var db := SQLite.new()
+
+const password_query: String = "SELECT password, salt, pid FROM auth WHERE username = ?"
+
+
+func _ready() -> void:
+	var config := ConfigFile.new()
+	config.load("res://auth.cfg")
+	var port = config.get_value("Auth", "port")
+	var max_gateways = config.get_value("Auth", "max_gateways")
+	var auth_token = config.get_value("Auth", "auth_token")
+	
+	set_name("auth")
+	set_target_name("gateway")
+	set_token(auth_token)
+	set_server(port, max_gateways)
+	
+	start_server()
+	
+	db.verbosity_level = SQLite.VerbosityLevel.NORMAL
+	db.path = db_path
+	create_or_open_db()
+	
+	print(check_with_db("name", "passworda"))
+
+func create_or_open_db() -> void:
+	var exists = FileAccess.file_exists(db_path)
+	if not db.open_db():
+		print("Failed to open or create db somehow: ", db.error_message)
+	
+	# Initialize database here
+	if not exists:
+		print("Database didn't exist, initializing")
+		var auth_db_dict := {
+			"pid": {"data_type":"int", "primary_key": true, "not_null": true, "auto_increment": true, "unique": true},
+			"email": {"data_type":"char(40)", "not_null": true, "unique": true},
+			"username": {"data_type":"char(20)", "not_null": true, "unique": true},
+			"password": {"data_type":"char(40)", "not_null": true},
+			"salt": {"data_type":"text", "not_null": true},
+		}
+		
+		if not db.create_table("auth", auth_db_dict):
+			print("Failed to create db table somehow: ", db.error_message)
+
+func check_with_db(username: String, password: String) -> int:
+	if not db.query_with_bindings(password_query, [username]):
+		printerr("error querying database: ", db.error_message)
+		return -1
+	if db.query_result_by_reference.is_empty():
+		return -1
+	
+	var result: Dictionary = db.query_result_by_reference[0]
+	var hashed_password: String = result["password"]
+	var salt: String = result["salt"]
+	var newhash := hash_password(password, salt)
+	return result["pid"]
+
+func insert_salted(email: String, username: String, password: String) -> int:
+	username = username.to_lower()
+	email = email.to_lower()
+	
+	var salt := get_salt()
+	var hashed_password := hash_password(password, salt)
+	
+	if not db.insert_row("auth", {
+		"email": email,
+		"username": username,
+		"password": hashed_password,
+		"salt": salt
+	}):
+		return -1
+	
+	var pid := db.last_insert_rowid
+	print("Created account for ", username, " with pid ", pid)
+	
+	return pid
+
+func get_salt() -> String:
+	randomize()
+	return str(randi()).sha256_text()
+
+func hash_password(password: String, salt: String) -> String:
+	var hashed_password := password
+	
+	var rounds := 2**18
+	while rounds > 0:
+		hashed_password = (hashed_password + salt).sha256_text()
+		rounds -= 1
+	
+	return hashed_password
+
+@rpc("any_peer", "call_remote", "reliable", 0)
+func authenticate(net_id: int, username: String, password: String):
+	var gateway_id := multiplayer.get_remote_sender_id()
+	
+	var pid := check_with_db(username, password)
+	rpc_id(gateway_id, "authenticate", net_id, pid)
+
+@rpc("any_peer", "call_remote", "reliable", 0)
+func create_account(net_id: int, email: String, username: String, password: String) -> void:
+	var gateway_id := multiplayer.get_remote_sender_id()
+	
+	var new_pid: int = -1
+	if username.length() <= 20 and username.length() >= 5:
+		if password.length() <= 40 or password.length() >= 8:
+			new_pid = insert_salted(email, username, password)
+	
+	rpc_id(gateway_id, "create_account", net_id, new_pid)

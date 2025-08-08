@@ -1,0 +1,64 @@
+[gd_scene load_steps=2 format=3 uid="uid://b6vye2ctom7p6"]
+
+[ext_resource type="Script" uid="uid://0bx0ohl5qd8y" path="res://scripts/menu/login/server_list.gd" id="1_xijuf"]
+
+[node name="ServerList" type="Control"]
+layout_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -210.0
+offset_top = -116.0
+offset_right = 210.0
+offset_bottom = 284.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+script = ExtResource("1_xijuf")
+
+[node name="ServerList" type="ColorRect" parent="."]
+custom_minimum_size = Vector2(420, 400)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.184314, 0.184314, 0.184314, 1)
+
+[node name="Margin" type="MarginContainer" parent="ServerList"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBoxContainer" type="VBoxContainer" parent="ServerList/Margin"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="ServerList/Margin/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 25
+text = "Choose server"
+horizontal_alignment = 1
+
+[node name="ScrollContainer" type="ScrollContainer" parent="ServerList/Margin/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="ServerList/Margin/VBoxContainer/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3

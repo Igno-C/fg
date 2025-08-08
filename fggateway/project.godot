@@ -1,0 +1,26 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="FGGateway"
+run/main_scene="uid://0c8vlaxonatu"
+config/features=PackedStringArray("4.4", "Forward Plus")
+config/icon="res://icon.svg"
+
+[autoload]
+
+AuthServer="*res://auth_server.gd"
+GatewayServer="*res://gateway_server.gd"
+ServerList="*res://server_list.gd"
+
+[editor]
+
+run/main_run_args="--headless"
