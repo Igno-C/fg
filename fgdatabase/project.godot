@@ -19,6 +19,10 @@ config/icon="res://icon.svg"
 
 DbServer="*res://db_server.gd"
 
+[editor]
+
+run/main_run_args="--headless"
+
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/godot-sqlite/plugin.cfg")

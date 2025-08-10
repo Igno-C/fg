@@ -4,11 +4,11 @@ compatibility_minimum = 4.3
 reloadable = true
 
 [libraries]
-linux.debug.x86_64 =     "res://../rust/target/debug/librgdext.so"
-linux.release.x86_64 =   "res://../rust/target/release/librgdext.so"
-windows.debug.x86_64 =   "res://../rust/target/debug.dll"
-windows.release.x86_64 = "res://../rust/target/release.dll"
-macos.debug =            "res://../rust/target/debug/librgdext.dylib"
-macos.release =          "res://../rust/target/release/librgdext.dylib"
-macos.debug.arm64 =      "res://../rust/target/debug/librgdext.dylib"
-macos.release.arm64 =    "res://../rust/target/release/librgdext.dylib"
+linux.debug.x86_64 =     "res://bin/debug/librgdext.so"
+linux.release.x86_64 =   "res://bin/release/librgdext.so"
+windows.debug.x86_64 =   "res://bin/debug.dll"
+windows.release.x86_64 = "res://bin/release.dll"
+macos.debug =            "res://bin/debug/librgdext.dylib"
+macos.release =          "res://bin/release/librgdext.dylib"
+macos.debug.arm64 =      "res://bin/debug/librgdext.dylib"
+macos.release.arm64 =    "res://bin/release/librgdext.dylib"

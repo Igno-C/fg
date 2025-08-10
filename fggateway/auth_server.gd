@@ -16,10 +16,11 @@ func _ready() -> void:
 	var port: int = config.get_value("Auth", "port")
 	var auth_token: String = config.get_value("Auth", "auth_token")
 	
-	set_name("auth")
-	set_target_name("gateway")
+	set_name("gateway auth")
+	set_target_name("auth")
 	set_token(auth_token)
 	set_client(port, address)
+	set_auto_reconnect(true)
 	
 	start_server()
 

@@ -23,8 +23,6 @@ func _ready() -> void:
 	db.verbosity_level = SQLite.VerbosityLevel.NORMAL
 	db.path = db_path
 	create_or_open_db()
-	
-	print(check_with_db("name", "passworda"))
 
 func create_or_open_db() -> void:
 	var exists = FileAccess.file_exists(db_path)
