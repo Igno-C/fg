@@ -1,13 +1,13 @@
 use godot::{classes::{multiplayer_api::RpcMode, multiplayer_peer::TransferMode, ENetMultiplayerPeer}, prelude::*};
-use crate::eventqueue::{EventQueue, ServerEvent, GameEvent};
+use crate::eventqueue::{EQueue, EQueueInitializer, GameEvent, ServerEvent};
 
 const AUTHENTICATION_TIMEOUT: f64 = 5.;
 const AUTH_TOKEN_TIMEOUT: f64 = 4.5;
 
 #[derive(GodotClass)]
 #[class(no_init, base=Node)]
-struct Server {
-    equeue: Option<Gd<EventQueue>>,
+pub struct Server {
+    equeue: EQueue,
 
     port: i32,
     max_players: i32,
@@ -26,8 +26,8 @@ struct Server {
 #[godot_api]
 impl INode for Server {
     fn ready(&mut self) {
-        let q = self.base().get_node_as::<EventQueue>("/root/QueueNode");
-        self.equeue = Some(q);
+        let q = self.base().get_node_as::<EQueueInitializer>("/root/QueueNode");
+        self.set_equeue(q.bind().shared_queue.clone());
 
         // Unreliable config for player movement
         let move_config: Dictionary = vdict! {
@@ -93,8 +93,9 @@ impl INode for Server {
             return true;
         });
 
-        let mut equeue = self.get_queue_mut();
-        for e in equeue.bind_mut().iter_server() {
+        // let mut equeue = self.get_queue_mut();
+        let iter = self.equeue.iter_server();
+        for e in iter {
             match e {
                 ServerEvent::PlayerMoveResponse(x, y, speed, net_id, target_net_id) => {
                     self.base_mut().rpc_id(
@@ -115,15 +116,21 @@ impl INode for Server {
 
 #[godot_api]
 impl Server {
-    fn get_queue_mut(&mut self) -> Gd<EventQueue> {
-        self.equeue.as_mut().unwrap().clone()
+    // fn get_queue_mut(&mut self) -> &mut EQueue {
+    //     self.equeue.as_mut().unwrap()
+    //     // self.equeue.as_mut().unwrap().clone()
+    // }
+
+    pub fn set_equeue(&mut self, e: EQueue) {
+        godot_print!("Set equeue to: {}", e.to_string());
+        self.equeue = e;
     }
 
     #[func]
     fn from_config(port: i32, max_players: i32) -> Gd<Self> {
         Gd::from_init_fn(|base| {
             Self {
-                equeue: None,
+                equeue: EQueue::default(),
 
                 port,
                 max_players,
@@ -177,7 +184,7 @@ impl Server {
 
     #[func]
     fn peer_disconnected(&mut self, net_id: i32) {
-        {self.equeue.as_mut().unwrap().bind_mut().push_game(
+        {self.equeue.push_game(
             GameEvent::PlayerDisconnected(net_id)
         )};
 
@@ -196,7 +203,7 @@ impl Server {
             self.pending_tokens.remove(matched_i);
             self.base().get_multiplayer().unwrap().cast::<godot::classes::SceneMultiplayer>().complete_auth(net_id);
 
-            self.equeue.as_mut().unwrap().bind_mut().push_game(
+            self.equeue.push_game(
                 GameEvent::PlayerJoined{net_id, pid}
             );
         }
@@ -209,7 +216,7 @@ impl Server {
     #[func]
     fn pmove(&mut self, x: i32, y: i32, speed: i32) {
         let net_id = self.base().get_multiplayer().unwrap().get_remote_sender_id();
-        self.equeue.as_mut().unwrap().bind_mut().push_game(
+        self.equeue.push_game(
             GameEvent::PlayerMove(x, y, speed, net_id)
         );
     }
@@ -224,7 +231,7 @@ impl Server {
     #[func]
     fn pinter(&mut self, x: i32, y: i32) {
         let net_id = self.base().get_multiplayer().unwrap().get_remote_sender_id();
-        self.equeue.as_mut().unwrap().bind_mut().push_game(
+        self.equeue.push_game(
             GameEvent::PlayerInteract(x, y, net_id)
         );
     }

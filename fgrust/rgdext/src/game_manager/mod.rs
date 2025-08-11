@@ -2,15 +2,16 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use godot::prelude::*;
 use rgdext_shared::playerdata::PlayerData;
-use super::eventqueue::{EventQueue, GameEvent};
+
+use crate::eventqueue::{EQueue, GameEvent, EQueueInitializer};
 use instance::{Instance, player::Player};
 
 mod instance;
 
 #[derive(GodotClass)]
 #[class(no_init, base=Node)]
-struct GameManager {
-    equeue: Option<Gd<EventQueue>>,
+pub struct GameManager {
+    equeue: EQueue,
 
     /// net_id -> player's current instance pointer
     // player_instances: HashMap<i32, Gd<instance::Instance>>,
@@ -26,9 +27,8 @@ struct GameManager {
 #[godot_api]
 impl INode for GameManager {
     fn ready(&mut self) {
-        let q = self.base().get_node_as::<EventQueue>("/root/QueueNode");
-        self.equeue = Some(q);
-
+        let q = self.base().get_node_as::<EQueueInitializer>("/root/QueueNode");
+        self.set_equeue(q.bind().shared_queue.clone());
 
         let mut db_server: Gd<Node> = self.base().get_node_as("/root/DbServer");
         db_server.connect("retrieved", &Callable::from_object_method(&self.to_gd(), "on_db_retrieved"));
@@ -39,9 +39,9 @@ impl INode for GameManager {
     }
 
     fn process(&mut self, _delta: f64) {
-        let mut equeue = self.equeue.as_mut().unwrap().clone();
-        let mut eq = equeue.bind_mut();
-        for e in eq.iter_game() {
+        // let mut equeue = self.equeue.as_mut().unwrap().clone();
+        // let mut eq = equeue.bind_mut();
+        for e in self.equeue.iter_game() {
             match e {
                 GameEvent::PlayerMove(x, y, speed, net_id) => self.player_move(x, y, speed, net_id),
                 GameEvent::PlayerJoined{net_id, pid} => self.player_joined(net_id),
@@ -66,13 +66,18 @@ impl GameManager {
     fn from_config() -> Gd<Self> {
         Gd::from_init_fn(|base| {
             Self {
-                equeue: None,
+                equeue: EQueue::default(),
                 player_locations: HashMap::new(),
                 current_players: 0,
                 instances: HashMap::new(),
                 base
             }
         })
+    }
+
+    pub fn set_equeue(&mut self, e: EQueue) {
+        godot_print!("Set equeue to {}", e.to_string());
+        self.equeue = e;
     }
 
     // #[func]
@@ -89,7 +94,7 @@ impl GameManager {
     #[func]
     fn on_db_retrieved(&mut self, pid: i32, data: PackedByteArray) {
         let data = PlayerData::from_bytes(data.as_slice()).unwrap();
-        self.equeue.as_mut().unwrap().bind_mut().push_game(GameEvent::NewPlayerData{pid, data});
+        self.equeue.push_game(GameEvent::NewPlayerData{pid, data});
     }
 
     fn retrieve(&mut self, pid: i32, force_create: bool) {
@@ -101,7 +106,7 @@ impl GameManager {
     }
 
     fn start_instance(&mut self, mapname: &str) -> Gd<Instance> {
-        let mut inst = instance::Instance::new_alloc();
+        let mut inst = instance::Instance::new(mapname, self.equeue.clone());
         // let mut i = inst.bind_mut();
         // i.mapname = mapname.to_string();
         // std::mem::drop(i);

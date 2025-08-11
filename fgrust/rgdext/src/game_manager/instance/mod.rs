@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use godot::{prelude::*, classes::ResourceLoader};
-use crate::eventqueue::{EventQueue, ServerEvent, GameEvent};
+use crate::eventqueue::{EQueue, ServerEvent, GameEvent};
 use rgdext_shared::{basemap::{BaseMap, CollisionArray}, playerdata::PlayerData};
 use player::Player; use entity::{Entities, GenericScriptedEntity, ResponseType, ScriptResponse};
 
@@ -9,13 +9,13 @@ pub mod player;
 mod entity;
 
 #[derive(GodotClass)]
-#[class(base=Node)]
+#[class(no_init, base=Node)]
 pub struct Instance {
     pub mapname: String,
     /// Events may only be pushed by instances in process().
     /// 
     /// Or in callbacks from children, like handle_entity_response.
-    equeue: Option<Gd<EventQueue>>,
+    equeue: EQueue,
     
     map: Option<Gd<BaseMap>>,
     col_array: CollisionArray,
@@ -34,29 +34,29 @@ pub struct Instance {
 
 #[godot_api]
 impl INode for Instance {
-    fn init(base: Base<Node>) -> Self {
-        Self {
-            mapname: "".into(),
+    // fn init(base: Base<Node>) -> Self {
+    //     Self {
+    //         mapname: "".into(),
 
-            equeue: None,
+    //         equeue: None,
 
-            map: None,
-            col_array: CollisionArray::new(),
+    //         map: None,
+    //         col_array: CollisionArray::new(),
 
-            players: HashMap::new(),
-            playercount: 0,
-            deferred_despawns: Vec::new(),
+    //         players: HashMap::new(),
+    //         playercount: 0,
+    //         deferred_despawns: Vec::new(),
 
-            entities: Entities::default(),
-            deferred_responses: Vec::new(),
+    //         entities: Entities::default(),
+    //         deferred_responses: Vec::new(),
 
-            base
-        }
-    }
+    //         base
+    //     }
+    // }
 
     fn ready(&mut self) {
-        let q = self.base().get_node_as::<EventQueue>("/root/QueueNode");
-        self.equeue = Some(q);
+        // let q = self.base().get_node_as::<EventQueue>("/root/QueueNode");
+        // self.equeue = Some(q);
 
         self.load_map();
 
@@ -68,8 +68,8 @@ impl INode for Instance {
             self.handle_entity_response(response);
         }
 
-        let mut equeue = self.equeue.as_ref().unwrap().clone();
-        let mut e = equeue.bind_mut();
+        // let mut equeue = self.equeue.as_ref().unwrap().clone();
+        // let mut e = equeue.bind_mut();
 
         // First, despawning players deferred for despawn
         if !self.deferred_despawns.is_empty() {
@@ -78,7 +78,7 @@ impl INode for Instance {
             for net_id in &self.deferred_despawns {
                 if self.players.remove(net_id).is_some() {
                     for target_net_id in self.get_adjacent_players(*net_id) {
-                        e.push_server(ServerEvent::UpdatePlayer(packed_nulldata.clone(), *net_id, *target_net_id));
+                        self.equeue.push_server(ServerEvent::UpdatePlayer(packed_nulldata.clone(), *net_id, *target_net_id));
                     }
                 }
             }
@@ -129,7 +129,7 @@ impl INode for Instance {
                 if !p.data.is_null() {
                     // Sending full data
                     let packed_data = std::rc::Rc::new(p.data.to_bytes());
-                    e.push_server(ServerEvent::UpdatePlayer(packed_data, *net_id, *net_id));
+                    self.equeue.push_server(ServerEvent::UpdatePlayer(packed_data, *net_id, *net_id));
                 }
 
                 // Updating player of other players on initial join
@@ -137,23 +137,23 @@ impl INode for Instance {
                     for target_net_id in self.get_adjacent_players(*net_id) {
                         let other_player = &self.players[target_net_id].borrow_mut();
                         let packed_mindata = std::rc::Rc::new(other_player.data.get_minimal().to_bytes());
-                        e.push_server(ServerEvent::UpdatePlayer(packed_mindata, *target_net_id, *net_id));
-                        e.push_server(ServerEvent::PlayerMoveResponse(other_player.x(), other_player.y(), 0, *target_net_id, *net_id));
+                        self.equeue.push_server(ServerEvent::UpdatePlayer(packed_mindata, *target_net_id, *net_id));
+                        self.equeue.push_server(ServerEvent::PlayerMoveResponse(other_player.x(), other_player.y(), 0, *target_net_id, *net_id));
                     }
                 }
                 
                 // Updating other players of given player's data, only minimal data
                 let packed_mindata = std::rc::Rc::new(p.data.get_minimal().to_bytes());
                 for target_net_id in self.get_adjacent_players(*net_id) {
-                    e.push_server(ServerEvent::UpdatePlayer(packed_mindata.clone(), *net_id, *target_net_id));
+                    self.equeue.push_server(ServerEvent::UpdatePlayer(packed_mindata.clone(), *net_id, *target_net_id));
                 }
             }
 
             // Pushing server events for every player movement (or initial position after spawning)
             if p.ticks_since_move == 0 || p.just_spawned {
-                e.push_server(ServerEvent::PlayerMoveResponse(p.x(), p.y(), p.speed(), *net_id, *net_id));
+                self.equeue.push_server(ServerEvent::PlayerMoveResponse(p.x(), p.y(), p.speed(), *net_id, *net_id));
                 for target_net_id in self.get_adjacent_players(*net_id) {
-                    e.push_server(ServerEvent::PlayerMoveResponse(p.x(), p.y(), p.speed(), *net_id, *target_net_id));
+                    self.equeue.push_server(ServerEvent::PlayerMoveResponse(p.x(), p.y(), p.speed(), *net_id, *target_net_id));
                 }
             }
 
@@ -178,6 +178,25 @@ impl INode for Instance {
 
 #[godot_api]
 impl Instance {
+    pub fn new(mapname: impl ToString, equeue: EQueue) -> Gd<Instance> {
+        Gd::from_init_fn(|base| {
+            Instance {
+                mapname: mapname.to_string(),
+                equeue,
+                map: None,
+                col_array: CollisionArray::new(),
+                players: HashMap::new(),
+                playercount: 0,
+                deferred_despawns: Vec::new(),
+
+                entities: Entities::default(),
+                deferred_responses: Vec::new(),
+
+                base
+            }
+        })
+    }
+
     /// Loads map of a given filename in the maps directory.
     /// 
     /// Assumes the root node of the map scene is a BaseMap.
@@ -236,9 +255,9 @@ impl Instance {
     fn handle_entity_response(&mut self, response: Gd<ScriptResponse>) {
         match &response.bind().response {
             ResponseType::MovePlayerToMap(inst_name, x, y, net_id) => {
-                let mut equeue = self.equeue.as_ref().unwrap().clone();
+                // let mut equeue = self.equeue.as_ref().unwrap().clone();
                 
-                equeue.bind_mut().push_game(GameEvent::PlayerJoinInstance(inst_name.to_string(), *x, *y, *net_id));
+                self.equeue.push_game(GameEvent::PlayerJoinInstance(inst_name.to_string(), *x, *y, *net_id));
             },
             ResponseType::Null => {},
         }

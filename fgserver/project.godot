@@ -21,6 +21,7 @@ config/icon="res://icon.svg"
 QueueNode="*res://queue_node.gd"
 ServerList="*res://server_list.gd"
 DbServer="*res://db_server.gd"
+NodeLoader="*res://node_loader.gd"
 
 [editor]
 
