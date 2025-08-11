@@ -24,22 +24,22 @@ func _ready() -> void:
 	
 	start_server()
 
-func validate(net_id: int, username: String, password: String):
-	var err = rpc_id(1, "authenticate", net_id, username, password)
+func authenticate(net_id: int, username: String, password: String):
+	var err = rpc_id(1, "_authenticate", net_id, username, password)
 	if err != OK:
 		printerr("Error on rpc for ", net_id, " in auth client: ", err)
 
-func create_new_account(net_id: int, email: String, username: String, password: String) -> void:
-	var err = rpc_id(1, "create_account", net_id, email, username, password)
+func create_account(net_id: int, username: String, password: String) -> void:
+	var err = rpc_id(1, "_create_account", net_id, username, password)
 	if err != OK:
 		printerr("Error on rpc for ", net_id, " in auth client: ", err)
 
 @rpc("any_peer", "call_remote", "reliable", 0)
-func authenticate(net_id: int, pid: int) -> void:
+func _authenticate(net_id: int, pid: int) -> void:
 	response.emit(net_id, pid)
 
 @rpc("any_peer", "call_remote", "reliable", 0)
-func create_account(net_id: int, new_pid: int) -> void:
+func _create_account(net_id: int, new_pid: int) -> void:
 	print("Created account for ", net_id, " with pid ", new_pid)
 	if new_pid == -1:
 		created_response.emit(net_id, false)

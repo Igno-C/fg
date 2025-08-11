@@ -26,8 +26,9 @@ func _ready() -> void:
 	creation_box.go_back_pressed.connect(_on_creation_go_back_press)
 	gateway.creation_status.connect(_on_creation_status)
 	
-	server_list.server_selected.connect(_on_server_selected)
+	server_list.pressed.connect(_on_server_selected)
 	gateway.got_server_list.connect(_on_got_server_list)
+	gateway.joined_server.connect(login_success.emit)
 	
 	open_login()
 	#var sl: Array[Dictionary] = [{"name": "a", "load": 1}, {"name": "bbbbbbbb", "load": 4}]
@@ -108,10 +109,10 @@ func _on_login_invalid() -> void:
 
 
 # Creation section
-func _on_creation_press(email: String, username: String, password: String, password2: String) -> void:
+func _on_creation_press(username: String, password: String, password2: String) -> void:
 	if validate_lengths(username, password):
 		if password == password2:
-			gateway.send_creation(email, username, password)
+			gateway.send_creation(username, password)
 			creation_box.set_enabled(false)
 			#set_input_enable(false)
 		else:

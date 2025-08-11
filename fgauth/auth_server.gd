@@ -34,7 +34,7 @@ func create_or_open_db() -> void:
 		print("Database didn't exist, initializing")
 		var auth_db_dict := {
 			"pid": {"data_type":"int", "primary_key": true, "not_null": true, "auto_increment": true, "unique": true},
-			"email": {"data_type":"char(40)", "not_null": true, "unique": true},
+			#"email": {"data_type":"char(40)", "not_null": true, "unique": true},
 			"username": {"data_type":"char(20)", "not_null": true, "unique": true},
 			"password": {"data_type":"char(40)", "not_null": true},
 			"salt": {"data_type":"text", "not_null": true},
@@ -56,15 +56,15 @@ func check_with_db(username: String, password: String) -> int:
 	var newhash := hash_password(password, salt)
 	return result["pid"]
 
-func insert_salted(email: String, username: String, password: String) -> int:
+func insert_salted(username: String, password: String) -> int:
 	username = username.to_lower()
-	email = email.to_lower()
+	#email = email.to_lower()
 	
 	var salt := get_salt()
 	var hashed_password := hash_password(password, salt)
 	
 	if not db.insert_row("auth", {
-		"email": email,
+		#"email": email,
 		"username": username,
 		"password": hashed_password,
 		"salt": salt
@@ -91,19 +91,19 @@ func hash_password(password: String, salt: String) -> String:
 	return hashed_password
 
 @rpc("any_peer", "call_remote", "reliable", 0)
-func authenticate(net_id: int, username: String, password: String):
+func _authenticate(net_id: int, username: String, password: String):
 	var gateway_id := multiplayer.get_remote_sender_id()
 	
 	var pid := check_with_db(username, password)
-	rpc_id(gateway_id, "authenticate", net_id, pid)
+	rpc_id(gateway_id, "_authenticate", net_id, pid)
 
 @rpc("any_peer", "call_remote", "reliable", 0)
-func create_account(net_id: int, email: String, username: String, password: String) -> void:
+func _create_account(net_id: int, username: String, password: String) -> void:
 	var gateway_id := multiplayer.get_remote_sender_id()
 	
 	var new_pid: int = -1
 	if username.length() <= 20 and username.length() >= 5:
 		if password.length() <= 40 or password.length() >= 8:
-			new_pid = insert_salted(email, username, password)
+			new_pid = insert_salted(username, password)
 	
-	rpc_id(gateway_id, "create_account", net_id, new_pid)
+	rpc_id(gateway_id, "_create_account", net_id, new_pid)

@@ -8,7 +8,7 @@ extends Control
 @onready var go_back_button: Button = get_node("CreationBox/GoBackButton")
 @onready var err_label: Label = get_node("CreationBox/Margin/VBox/ErrorLabel")
 
-signal pressed(email: String, username: String, password: String, password2: String)
+signal pressed(username: String, password: String, password2: String)
 signal go_back_pressed
 
 
@@ -39,7 +39,7 @@ func show_box(show: bool) -> void:
 
 func _on_button_pressed() -> void:
 	err_label.text = ""
-	pressed.emit(email.text, username.text, password.text, password2.text)
+	pressed.emit(username.text, password.text, password2.text)
 
 func _on_go_back_pressed() -> void:
 	go_back_pressed.emit()

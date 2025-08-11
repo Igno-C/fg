@@ -4,7 +4,7 @@ var entry_scene: PackedScene = preload("res://scenes/menu/login/ServerListEntry.
 @onready var vbox: VBoxContainer = get_node("ServerList/Margin/VBoxContainer/ScrollContainer/VBox")
 
 
-signal server_selected(server_name: String)
+signal pressed(server_name: String)
 
 
 func set_enabled(enabled: bool) -> void:
@@ -36,4 +36,4 @@ func populate(servers: Array[Dictionary]) -> void:
 
 func _on_entry_pressed(server_name: String) -> void:
 	set_enabled(false)
-	server_selected.emit(server_name)
+	pressed.emit(server_name)

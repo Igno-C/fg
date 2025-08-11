@@ -62,16 +62,16 @@ func log_in(username: String, password: String) -> void:
 	var net_id := multiplayer.get_remote_sender_id()
 	print("Received credentials from ", net_id)
 	if waitinglist[net_id].received_request():
-		auth_server.validate(net_id, username, password)
+		auth_server.authenticate(net_id, username, password)
 	else:
 		print("Login attempted with queued request by ", net_id)
 
 @rpc("any_peer", "call_remote", "reliable", 0)
-func create_account(email: String, username: String, password: String) -> void:
+func create_account(username: String, password: String) -> void:
 	var net_id := multiplayer.get_remote_sender_id()
 	print("Attempting account creation for ", net_id)
 	if waitinglist[net_id].received_request():
-		auth_server.create_new_account(net_id, email, username, password)
+		auth_server.create_account(net_id, username, password)
 	else:
 		print("Account creation attempted with queued request by ", net_id)
 
@@ -83,8 +83,8 @@ func get_server_list() -> void:
 		print("Get server list attempt by unauthenticated peer ", net_id)
 		return
 	print("Getting server list for ", net_id)
-	#var list: Array[Dictionary] = server_list.get_server_list()
-	var list: Array[Dictionary] = [{"name": "Server 1", "load": 1}, {"name": "Server 2", "load": 2}]
+	var list: Array[Dictionary] = server_list.get_server_list()
+	#var list: Array[Dictionary] = [{"name": "Server 1", "load": 1}, {"name": "Server 2", "load": 2}]
 	rpc_id(net_id, "get_server_list", list)
 
 @rpc("any_peer", "call_remote", "reliable", 1)

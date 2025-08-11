@@ -40,7 +40,7 @@ theme_override_constants/margin_bottom = 25
 
 [node name="VBox" type="VBoxContainer" parent="CreationBox/Margin"]
 layout_mode = 2
-theme_override_constants/separation = 11
+theme_override_constants/separation = 15
 alignment = 1
 
 [node name="LoginLabel" type="Label" parent="CreationBox/Margin/VBox"]
@@ -51,6 +51,7 @@ horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="EmailEdit" type="LineEdit" parent="CreationBox/Margin/VBox"]
+visible = false
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 placeholder_text = "Email"

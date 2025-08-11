@@ -5,7 +5,8 @@ var ip: String
 var port: int
 
 # Used to temporarily hold the username and password while waiting for gateway connection
-var email_held: String = ""
+#var email_held: String = ""
+var creation: bool = false
 var username_held: String = ""
 var password_held: String = ""
 
@@ -43,7 +44,7 @@ func _ready() -> void:
 # Is run once connected to gateway
 # Which rpc is run depends on what data was input
 func send_held_data() -> void:
-	if email_held.is_empty():
+	if not creation:
 		if username_held.is_empty():
 			print("getting server list")
 			rpc_id(1, "get_server_list")
@@ -52,8 +53,9 @@ func send_held_data() -> void:
 			rpc_id(1, "log_in", username_held, password_held)
 	else:
 		print("creating account")
-		rpc_id(1, "create_account", email_held, username_held, password_held)
-		email_held = ""
+		rpc_id(1, "create_account", username_held, password_held)
+		creation = false
+		#email_held = ""
 	username_held = ""
 	password_held = ""
 
@@ -70,8 +72,9 @@ func send_credentials(username: String, password: String) -> void:
 	password_held = password
 	start_client()
 
-func send_creation(email: String, username: String, password: String) -> void:
-	email_held = email
+func send_creation(username: String, password: String) -> void:
+	#email_held = email
+	creation = true
 	username_held = username
 	password_held = password
 	start_client()
@@ -90,7 +93,7 @@ func start_client() -> void:
 	var err := network.create_client(ip, port)
 	if err != OK:
 		print("Encountered other error in gateway: ", err)
-		email_held = ""
+		creation = false
 		username_held = ""
 		password_held = ""
 		other_error.emit(err)
@@ -146,4 +149,4 @@ func get_server_list(servers: Array[Dictionary]) -> void:
 func join_server(address: String, port: int, token: String) -> void:
 	succeeded = true
 	await get_tree().create_timer(0.5).timeout
-	joined_server.emit(address, port, token)
+	joined_server.emit(token, address, port)
