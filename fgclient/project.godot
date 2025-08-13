@@ -19,6 +19,7 @@ config/icon="res://icon.svg"
 
 ServerNode="*res://scripts/server_node.gd"
 GatewayServer="*res://scripts/gateway_server.gd"
+Ticker="*res://ticker.gd"
 
 [input]
 

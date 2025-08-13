@@ -1,18 +1,21 @@
 class_name Server
-
 extends Node
 
+const FAKELAG_ENABLED: bool = false
+const FAKELAG: float = 150.
+const FAKEJITTER: float = 30.
 var network: ENetMultiplayerPeer
 var token := ""
 
 signal player_update(x: int, y: int, speed: int, net_id: int)
-signal entity_update(x: int, y: int, speed: int)
+#signal entity_update(x: int, y: int, speed: int)
+signal generic_update()
 signal data_update(data: PlayerContainer, net_id: int)
 
-signal net_id_update(net_id: int)
+#signal net_id_update(net_id: int)
 
-signal connection_success
-signal connection_failure(err: int)
+signal connection_success(net_id: int)
+signal connection_failure(err: String)
 
 func _ready() -> void:
 	var move_config: Dictionary = {
@@ -35,7 +38,7 @@ func _ready() -> void:
 	}
 	rpc_config("pmove", move_config)
 	rpc_config("pdata", data_config)
-	rpc_config("pinter", interaction_config)
+	rpc_config("pevent", interaction_config)
 	
 	var mult = multiplayer as SceneMultiplayer
 	mult.auth_callback = auth_callback
@@ -43,21 +46,20 @@ func _ready() -> void:
 	mult.peer_authenticating.connect(_on_peer_authenticating)
 	mult.peer_authentication_failed.connect(_on_peer_authentication_failed)
 	
-	mult.peer_connected.connect(_peer_connected)
-	mult.peer_disconnected.connect(_peer_disconnected)
+	mult.peer_connected.connect(_on_peer_connected)
+	mult.peer_disconnected.connect(_on_peer_disconnected)
+	
+	mult.connection_failed.connect(connection_failure.emit.bind("Error: Failed to connect to server"))
 
 func connect_to_server(t: String, ip: String, port: int) -> void:
 	network = ENetMultiplayerPeer.new()
-	#network.peer_connected.connect(_peer_connected)
-	#network.peer_disconnected.connect(_peer_disconnected)
 	
-	if network.create_client(ip, port) != OK:
-		print("pissed")
-		connection_failure.emit(2)
-	
-	multiplayer.multiplayer_peer = network
+	var err := network.create_client(ip, port)
+	if err != OK:
+		connection_failure.emit("Error: Failed to create network client - " + str(err))
 	
 	token = t
+	multiplayer.multiplayer_peer = network
 
 func auth_callback(net_id: int, data: PackedByteArray) -> void:
 	var mult = multiplayer as SceneMultiplayer
@@ -70,44 +72,38 @@ func _on_peer_authenticating(net_id: int) -> void:
 	token = ""
 
 func _on_peer_authentication_failed(net_id: int) -> void:
-	connection_failure.emit(1)
+	connection_failure.emit("Error: Failed authentication with server")
 
 func _process(delta: float) -> void:
 	pass
 
-func _peer_connected(_id: int) -> void:
-	print("Successful connect as ", multiplayer.multiplayer_peer.get_unique_id())
-	var net_id = multiplayer.multiplayer_peer.get_unique_id()
-	net_id_update.emit(net_id)
+func _on_peer_connected(net_id: int) -> void:
+	print("Successful connect as ", net_id)
+	connection_success.emit(net_id)
 
-func _peer_disconnected(_id: int) -> void:
-	print("Disconnect as ", multiplayer.multiplayer_peer.get_unique_id())
-	net_id_update.emit(0)
+func _on_peer_disconnected(net_id: int) -> void:
+	print("Disconnect as ", net_id)
+	connection_failure.emit("Disconnected from server")
 
 func send_move(x: int, y: int, speed: int) -> void:
-	#var timestamp = Time.get_ticks_msec()
-	#print("Fakelagging...")
-	#var timer := Timer.new()
-	#var fakelag: float = 0.15 + randf_range(-0.05, 0.05)
-	#timer.autostart = true; timer.one_shot = true; timer.wait_time = fakelag
-	#add_child(timer)
-	#await timer.timeout
-	#print("Actually sending now after ", Time.get_ticks_msec()-timestamp, "ms")
+	if FAKELAG_ENABLED:
+		var timestamp := Time.get_ticks_msec()
+		print("Fakelagging...")
+		var fakelag: float = FAKELAG + randf_range(-FAKEJITTER, FAKEJITTER)
+		await get_tree().create_timer(fakelag).timeout
+		print("Actually sending now after ", Time.get_ticks_msec()-timestamp, "ms")
 	rpc_id(1, "pmove", x, y, speed)
 
-func send_interaction(x: int, y: int) -> void:
-	print("Sending interaction at ", x, ", ", y)
-	rpc_id(1, "pinter", x, y)
+func send_event(event: GenericEvent) -> void:
+	rpc_id(1, "pevent", event.to_bytearray())
 
-func pinter() -> void:
+func pevent() -> void:
 	pass
 
-#@rpc("authority", "call_remote", "unreliable_ordered", 0)
 func pmove(x: int, y: int, speed: int, net_id: int) -> void:
 	player_update.emit(x, y, speed, net_id)
 
 func pdata(data: PackedByteArray, net_id: int) -> void:
-	var container: PlayerContainer = PlayerContainer.new()
-	container.parse_bytearray(data)
+	var container := PlayerContainer.from_bytearray(data)
 	
 	data_update.emit(container, net_id)

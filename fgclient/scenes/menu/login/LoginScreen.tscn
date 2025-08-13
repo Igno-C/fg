@@ -15,6 +15,7 @@ grow_vertical = 2
 script = ExtResource("1_q4veg")
 
 [node name="Title" type="Label" parent="."]
+visible = false
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -33,10 +34,49 @@ horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="LoginBox" parent="." instance=ExtResource("2_8vmtc")]
+visible = false
 layout_mode = 1
 
 [node name="CreationBox" parent="." instance=ExtResource("2_usbfb")]
+visible = false
 layout_mode = 1
 
 [node name="ServerList" parent="." instance=ExtResource("2_k3m18")]
+visible = false
 layout_mode = 1
+
+[node name="LoadingBox" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ColorRect" type="ColorRect" parent="LoadingBox"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -180.0
+offset_top = -60.0
+offset_right = 180.0
+offset_bottom = 60.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.184314, 0.184314, 0.184314, 1)
+
+[node name="Label" type="Label" parent="LoadingBox/ColorRect"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 30
+text = "Connecting to server..."
+horizontal_alignment = 1
+vertical_alignment = 1

@@ -20,6 +20,7 @@ config/icon="res://icon.svg"
 AuthServer="*res://auth_server.gd"
 GatewayServer="*res://gateway_server.gd"
 ServerList="*res://server_list.gd"
+GatewayDbServer="*res://gateway_db_server.gd"
 
 [editor]
 

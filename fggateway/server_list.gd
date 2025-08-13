@@ -39,7 +39,7 @@ func join_server(name: String, pid: int) -> ServerDirections:
 		if server.name == name:
 			randomize()
 			var token := str(randi()).sha256_text()
-			rpc_id(net_id, "update", token, pid)
+			rpc_id(net_id, "_update", token, pid)
 			return ServerDirections.new(server.address, server.port, token)
 	
 	return ServerDirections.new("", -1, "")
@@ -52,7 +52,7 @@ func _peer_disconnected(user_id) -> void:
 	servers.erase(user_id)
 
 @rpc("any_peer", "call_remote", "unreliable_ordered", 0)
-func update(current_players: int, max_players: int = -1, port: int = -1, name: String = ""):
+func _update(current_players: int, max_players: int = -1, port: int = -1, name: String = ""):
 	var net_id := multiplayer.get_remote_sender_id()
 	var server_stats: ServerStats = servers[net_id]
 	server_stats.current_players = current_players

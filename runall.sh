@@ -42,7 +42,7 @@ done
 # Function to start a Godot instance and track its PID
 start_godot() {
     local path="$1"
-    gnome-terminal --disable-factory -- "$GODOT_PATH" --path "$path" --headless &
+    gnome-terminal --disable-factory --title "$path" -- "$GODOT_PATH" --path "$path" --headless &
     echo "Registering $!"
     PIDS+=($!)
 }
@@ -55,7 +55,7 @@ start_godot "./fgserver/"
 #start_godot "./fgserver/"
 
 # Start client (not headless)
-gnome-terminal --disable-factory -- "$GODOT_PATH" --path "./fgclient/" &
+gnome-terminal --disable-factory --title "Client" -- "$GODOT_PATH" --path "./fgclient/" &
 echo "Registering $!"
 PIDS+=($!)
 

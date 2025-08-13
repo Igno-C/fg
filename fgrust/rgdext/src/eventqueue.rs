@@ -1,5 +1,6 @@
 use godot::prelude::*;
 use rgdext_shared::playerdata::PlayerData;
+use std::{rc::Rc, cell::RefCell};
 
 // #[derive(GodotClass)]
 // #[class(base=Node)]
@@ -44,45 +45,20 @@ use rgdext_shared::playerdata::PlayerData;
 //     }
 // }
 
-pub struct ConsumingIterator<'a, T>(&'a mut Vec<T>);
+// pub struct ConsumingIterator<'a, T>(&'a mut Vec<T>);
 
-impl<'a, T> Iterator for ConsumingIterator<'a, T> {
-    type Item = T;
+// impl<'a, T> Iterator for ConsumingIterator<'a, T> {
+//     type Item = T;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.pop()
-    }
-}
-
-pub enum ServerEvent {
-    /// x, y, speed, net_id, target_net_id
-    PlayerMoveResponse(i32, i32, i32, i32, i32),
-    /// pdata, net_id, target_net_id
-    /// 
-    /// Uses a reference counted pointer to only store one copy of the data for each event
-    UpdatePlayer(std::rc::Rc<Vec<u8>>, i32, i32),
-}
-
-pub enum GameEvent {
-    /// deltax, deltay, speed, net_id
-    PlayerMove(i32, i32, i32, i32),
-    /// net_id
-    PlayerJoined{net_id: i32, pid: i32},
-    /// net_id
-    PlayerDisconnected(i32),
-    /// name, x, y, net_id
-    /// 
-    /// Joins player to an instance by the given map name
-    PlayerJoinInstance(String, i32, i32, i32),
-    /// x, y, net_id
-    PlayerInteract(i32, i32, i32),
-    NewPlayerData{pid: i32, data: PlayerData},
-}
+//     fn next(&mut self) -> Option<Self::Item> {
+//         self.0.pop()
+//     }
+// }
 
 #[derive(GodotClass)]
 #[class(base=Node)]
 pub struct EQueueInitializer {
-    pub shared_queue: EQueue,
+    // pub shared_queue: EQueue,
     base: Base<Node>
 }
 
@@ -91,9 +67,14 @@ pub struct EQueueInitializer {
 impl INode for EQueueInitializer {
     fn init(base: Base<Node>) -> EQueueInitializer {
         EQueueInitializer {
-            shared_queue: EQueue::default(),
+            // shared_queue: EQueue::default(),
             base
         }
+    }
+
+    fn ready(&mut self) {
+        self.set_equeue();
+        self.base_mut().queue_free();
     }
 }
 
@@ -110,7 +91,6 @@ impl EQueueInitializer {
     }
 }
 
-use std::rc::Rc; use std::cell::RefCell;
 #[derive(Clone, Default)]
 pub struct EQueue {
     game_events: Rc<RefCell<Vec<GameEvent>>>,
@@ -142,12 +122,28 @@ impl EQueue {
     }
 }
 
-pub struct ConsumingRefIterator<'a, T>(std::cell::RefMut<'a, Vec<T>>);
+pub enum ServerEvent {
+    /// x, y, speed, net_id, target_net_id
+    PlayerMoveResponse(i32, i32, i32, i32, i32),
+    /// pdata, net_id, target_net_id
+    /// 
+    /// Uses a reference counted pointer to only store one copy of the data for each event
+    UpdatePlayer(std::rc::Rc<Vec<u8>>, i32, i32),
+}
 
-impl<'a, T> Iterator for ConsumingRefIterator<'a, T> {
-    type Item = T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.pop()
-    }
+pub enum GameEvent {
+    /// deltax, deltay, speed, net_id
+    PlayerMove(i32, i32, i32, i32),
+    /// net_id
+    PlayerJoined{net_id: i32, pid: i32},
+    /// net_id
+    PlayerDisconnected(i32),
+    /// name, x, y, net_id
+    /// 
+    /// Joins player to an instance by the given map name
+    PlayerJoinInstance(String, i32, i32, i32),
+    /// x, y, net_id
+    PlayerInteract{x: i32, y: i32, net_id: i32},
+    UpdatedPlayerData{pid: i32},
+    PDataRequest{net_id: i32, pid: i32}
 }

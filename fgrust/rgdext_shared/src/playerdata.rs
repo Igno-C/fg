@@ -4,28 +4,28 @@ use godot::prelude::*;
 
 
 #[derive(GodotClass)]
-#[class(base=RefCounted)]
+#[class(no_init, base=RefCounted)]
 pub struct PlayerContainer {
     data: PlayerData,
     
     base: Base<RefCounted>
 }
 
-#[godot_api]
-impl IRefCounted for PlayerContainer {
-    fn init(base: Base<RefCounted>) -> Self {
-        PlayerContainer {
-            data: PlayerData::default(),
+// #[godot_api]
+// impl IRefCounted for PlayerContainer {
+//     fn init(base: Base<RefCounted>) -> Self {
+//         PlayerContainer {
+//             data: PlayerData::default(),
 
-            base
-        }
-    }
-}
+//             base
+//         }
+//     }
+// }
 
 #[godot_api]
 impl PlayerContainer {
     #[func]
-    pub fn from_bytearray(&mut self, b: PackedByteArray) -> Gd<PlayerContainer> {
+    fn from_bytearray(b: PackedByteArray) -> Gd<PlayerContainer> {
         Gd::from_init_fn(|base| {
             PlayerContainer {
                 data: 
@@ -42,10 +42,12 @@ impl PlayerContainer {
     }
 
     #[func]
-    fn default() -> Gd<PlayerContainer> {
+    fn from_name(name: String) -> Gd<PlayerContainer> {
+        let mut data = PlayerData::default();
+        data.name = name;
         Gd::from_init_fn(|base| {
             PlayerContainer {
-                data: PlayerData::default(),
+                data,
                 base
             }
         })

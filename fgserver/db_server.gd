@@ -13,21 +13,22 @@ func _ready() -> void:
 	set_name("db server")
 	set_target_name("db")
 	set_token(auth_token)
+	set_auto_reconnect(true)
 	set_client(port, ip)
 	
 	start_server()
 
-func save_data(pid: int, data: PackedByteArray) -> void:
-	rpc_id(1, "save", pid, data)
+func save(pid: int, data: PackedByteArray) -> void:
+	rpc_id(1, "_save", pid, data)
 
-func retrieve_data(pid: int, force_create: bool) -> void:
-	rpc_id(1, "retrieve", pid, force_create)
+func retrieve(pid: int, force_create: bool) -> void:
+	rpc_id(1, "_retrieve", pid, force_create)
 
 @rpc("any_peer", "call_remote", "reliable", 0)
-func save(pid: int):
+func _save(pid: int):
 	request_save.emit(pid)
 
 @rpc("any_peer", "call_remote", "reliable", 0)
-func retrieve(pid: int, data: PackedByteArray):
+func _retrieve(pid: int, data: PackedByteArray):
 	print("Retrieved data from db for pid ", pid, ": ", data)
 	retrieved.emit(pid, data)

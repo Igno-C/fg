@@ -9,31 +9,46 @@ use instance::{Instance, player::Player};
 mod instance;
 
 #[derive(GodotClass)]
-#[class(no_init, base=Node)]
+#[class(base=Node)]
 pub struct GameManager {
     equeue: EQueue,
 
     /// net_id -> player's current instance pointer
     // player_instances: HashMap<i32, Gd<instance::Instance>>,
     player_locations: HashMap<i32, (Rc<RefCell<Player>>, Gd<instance::Instance>)>,
-    current_players: i32,
+    player_datas: HashMap<i32, Rc<RefCell<PlayerData>>>,
+    // current_players: i32,
 
     /// mapname -> list of instances
     instances: HashMap<String, Vec<Gd<instance::Instance>>>,
+    /// net_id, pid
+    deferred_datagets: Vec<(i32, i32)>,
 
     base: Base<Node>
 }
 
 #[godot_api]
 impl INode for GameManager {
+    fn init(base: Base<Node>) -> Self {
+        Self {
+            equeue: EQueue::default(),
+            player_locations: HashMap::new(),
+            player_datas: HashMap::new(),
+            // current_players: 0,
+            instances: HashMap::new(),
+            deferred_datagets: Vec::new(),
+            base
+        }
+    }
+
     fn ready(&mut self) {
-        let q = self.base().get_node_as::<EQueueInitializer>("/root/QueueNode");
-        self.set_equeue(q.bind().shared_queue.clone());
+        // let q = self.base().get_node_as::<EQueueInitializer>("/root/QueueNode");
+        // self.set_equeue(q.bind().shared_queue.clone());
 
         let mut db_server: Gd<Node> = self.base().get_node_as("/root/DbServer");
         db_server.connect("retrieved", &Callable::from_object_method(&self.to_gd(), "on_db_retrieved"));
-        self.base_mut().connect("save", &Callable::from_object_method(&db_server, "save_data"));
-        self.base_mut().connect("retrieve", &Callable::from_object_method(&db_server, "retrieve_data"));
+        self.base_mut().connect("save", &Callable::from_object_method(&db_server, "save"));
+        self.base_mut().connect("retrieve", &Callable::from_object_method(&db_server, "retrieve"));
 
         godot_print!("Game manager node ready.\n");
     }
@@ -47,8 +62,9 @@ impl INode for GameManager {
                 GameEvent::PlayerJoined{net_id, pid} => self.player_joined(net_id),
                 GameEvent::PlayerDisconnected(net_id) => self.player_despawn(net_id),
                 GameEvent::PlayerJoinInstance(mapname, x, y, net_id) => self.player_join_instance(&mapname, x, y, net_id),
-                GameEvent::PlayerInteract(x, y, net_id) => self.player_interact(x, y, net_id),
-                GameEvent::NewPlayerData{pid, data} => {}
+                GameEvent::PlayerInteract{x, y, net_id} => self.player_interact(x, y, net_id),
+                GameEvent::UpdatedPlayerData{pid} => {},
+                GameEvent::PDataRequest{net_id, pid} => {}
             }
         }
     }
@@ -62,39 +78,36 @@ impl GameManager {
     #[signal]
     fn save(pid: i32, data: PackedByteArray);
 
-    #[func]
-    fn from_config() -> Gd<Self> {
-        Gd::from_init_fn(|base| {
-            Self {
-                equeue: EQueue::default(),
-                player_locations: HashMap::new(),
-                current_players: 0,
-                instances: HashMap::new(),
-                base
-            }
-        })
-    }
+    // #[func]
+    // fn from_config() -> Gd<Self> {
+    //     Gd::from_init_fn(|base| {
+    //         Self {
+    //             equeue: EQueue::default(),
+    //             player_locations: HashMap::new(),
+    //             current_players: 0,
+    //             instances: HashMap::new(),
+    //             base
+    //         }
+    //     })
+    // }
 
     pub fn set_equeue(&mut self, e: EQueue) {
         godot_print!("Set equeue to {}", e.to_string());
         self.equeue = e;
     }
 
-    // #[func]
-    // fn current_players(&self) -> i32 {
-    //     self.current_players
-    // }
-
-    // #[func]
-    // fn max_players(&self) -> i32 {
-    //     self.max_players
-    // }
-
-
     #[func]
     fn on_db_retrieved(&mut self, pid: i32, data: PackedByteArray) {
         let data = PlayerData::from_bytes(data.as_slice()).unwrap();
-        self.equeue.push_game(GameEvent::NewPlayerData{pid, data});
+
+        if let Some(pdata) = self.player_datas.get_mut(&pid) {
+            *pdata.borrow_mut() = data;
+            self.equeue.push_game(GameEvent::UpdatedPlayerData{pid});
+            todo!("Something should also happen here");
+        }
+        else {
+            self.player_datas.insert(pid, Rc::new(RefCell::new(data)));
+        }
     }
 
     fn retrieve(&mut self, pid: i32, force_create: bool) {
@@ -151,16 +164,16 @@ impl GameManager {
         let mut instance = self.get_instance(&player.borrow().data.location);
         instance.bind_mut().spawn_player(player.clone(), x, y, net_id);
         self.player_locations.insert(net_id, (player, instance));
-        self.current_players += 1;
+        // self.current_players += 1;
     }
 
     fn player_despawn(&mut self, net_id: i32) {
         if let Some((_, instance)) = self.player_locations.get_mut(&net_id) {
             instance.bind_mut().despawn_player(net_id);
-            self.player_locations.remove(&net_id);
         }
+        self.player_locations.remove(&net_id);
 
-        self.current_players -= 1;
+        // self.current_players -= 1;
     }
 
     /// Gets the best instance for given map name.

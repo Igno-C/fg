@@ -5,10 +5,6 @@
 [node name="Main" type="Node"]
 script = ExtResource("1_m8rsx")
 
-[node name="TickTimer" type="Timer" parent="."]
-wait_time = 0.1
-autostart = true
-
 [node name="Ui" type="Control" parent="."]
 layout_mode = 3
 anchors_preset = 15

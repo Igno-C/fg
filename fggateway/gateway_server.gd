@@ -4,6 +4,7 @@ const TIMEOUT: float = 5.
 
 @onready var auth_server: AuthServer = get_node("/root/AuthServer")
 @onready var server_list: ServerList = get_node("/root/ServerList")
+@onready var gateway_db_server: GatewayDbServer = get_node("/root/GatewayDbServer")
 
 var waitinglist: Dictionary[int, GatewayWaiter] = {}
 
@@ -44,6 +45,7 @@ func _on_auth_response(net_id: int, pid: int) -> void:
 		var waiter: GatewayWaiter = waitinglist[net_id]
 		waiter.authenticate(pid)
 		rpc_id(net_id, "log_in", true)
+		gateway_db_server.create_new_player(pid, waiter.username)
 	else:
 		print("Login failed for ", net_id)
 		rpc_id(net_id, "log_in", false)
@@ -70,7 +72,9 @@ func log_in(username: String, password: String) -> void:
 func create_account(username: String, password: String) -> void:
 	var net_id := multiplayer.get_remote_sender_id()
 	print("Attempting account creation for ", net_id)
-	if waitinglist[net_id].received_request():
+	var waiter := waitinglist[net_id]
+	if waiter.received_request():
+		waiter.username = username
 		auth_server.create_account(net_id, username, password)
 	else:
 		print("Account creation attempted with queued request by ", net_id)

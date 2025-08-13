@@ -18,7 +18,7 @@ var ticks_since_move: int = 100
 
 
 signal send_move(x: int, y: int, speed: int)
-signal send_interaction(x: int, y: int)
+signal send_event(event: GenericEvent)
 signal set_debug_label(text: String)
 
 func _process(_delta:) -> void:
@@ -35,8 +35,8 @@ func _process(_delta:) -> void:
 	if Input.is_action_just_pressed("Sprint"): next_speed = 2
 	
 	if Input.is_action_just_pressed("Interact"):
-		var target = player.pos + player.get_dir_vec()
-		send_interaction.emit(target.x, target.y)
+		var target := player.pos + player.get_dir_vec()
+		send_event.emit(GenericEvent.interaction(target.x, target.y))
 
 func _input(event: InputEvent) -> void:
 	if player == null:

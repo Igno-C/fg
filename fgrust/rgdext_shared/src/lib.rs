@@ -3,7 +3,7 @@
 pub mod basemap;
 pub mod playerdata;
 pub mod serverconnector;
-// pub mod filedb;
+pub mod genericevent;
 
 //struct FGExtensionShared;
 //

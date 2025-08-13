@@ -9,6 +9,8 @@ var pid: int = -1
 var time: float = 0.
 var got_request: bool = false
 
+var username: String
+
 # Returns true past timeout
 func tick_timeout(delta: float) -> bool:
 	time += delta

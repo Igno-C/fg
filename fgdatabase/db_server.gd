@@ -12,13 +12,13 @@ func _ready() -> void:
 	var config := ConfigFile.new()
 	config.load("res://db.cfg")
 	var port = config.get_value("DbServer", "port")
-	var max_gateways = config.get_value("DbServer", "max_servers")
+	var max_servers = config.get_value("DbServer", "max_servers")
 	var auth_token = config.get_value("DbServer", "auth_token")
 	
-	set_name("db")
+	set_name("db-game server")
 	set_target_name("game server")
 	set_token(auth_token)
-	set_server(port, max_gateways)
+	set_server(port, max_servers)
 	
 	start_server()
 	
@@ -26,7 +26,8 @@ func _ready() -> void:
 	db.path = db_path
 	create_or_open_db()
 	
-	retrieve(1, true)
+	var gateway_db_server: Node = get_node("/root/GatewayDbServer")
+	gateway_db_server.create_new_player.connect(create_new_player)
 
 func create_or_open_db() -> void:
 	var exists = FileAccess.file_exists(db_path)
@@ -44,31 +45,32 @@ func create_or_open_db() -> void:
 		if not db.create_table("pdata", game_db_dict):
 			print("Failed to create db table somehow: ", db.error_message)
 
-func create_new_playerdata(pid: int) -> void:
+func create_new_player(pid: int, username: String) -> void:
 	db.insert_row("pdata", {
 		"pid": pid,
-		"data": PlayerContainer.default().to_bytearray()
+		"data": PlayerContainer.from_name(username).to_bytearray()
 	})
 
 @rpc("any_peer", "call_remote", "reliable", 0)
-func save(pid: int, data: PackedByteArray) -> void:
+func _save(pid: int, data: PackedByteArray) -> void:
 	var server_id := multiplayer.get_remote_sender_id()
 	if not db.query_with_bindings(save_query, [data, pid]):
 		print("Failed to save data for pid ", pid, ": ", db.error_message)
 
 # force_create means that if pid doesn't have data, it should be created
 @rpc("any_peer", "call_remote", "reliable", 0)
-func retrieve(pid: int, force_create: bool = false) -> void:
+func _retrieve(pid: int, lock: bool = false) -> void:
 	var server_id := multiplayer.get_remote_sender_id()
 	db.query_with_bindings(data_query, [pid])
 	
-	var data: PackedByteArray
+	var data := PackedByteArray()
 	if db.query_result_by_reference.is_empty():
-		if force_create:
-			create_new_playerdata(pid)
-			db.query_with_bindings(data_query, [pid])
-			data = db.query_result_by_reference[0]["data"]
+		rpc_id(server_id, "_retrieve", pid, data)
+		#if force_create:
+			#create_new_playerdata(pid)
+			#db.query_with_bindings(data_query, [pid])
+			#data = db.query_result_by_reference[0]["data"]
 	else:
 		data = db.query_result_by_reference[0]["data"]
 	
-	rpc_id(server_id, "retrieve", pid, data)
+	rpc_id(server_id, "_retrieve", pid, data)

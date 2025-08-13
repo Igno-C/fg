@@ -1,11 +1,12 @@
 use godot::{classes::{multiplayer_api::RpcMode, multiplayer_peer::TransferMode, ENetMultiplayerPeer}, prelude::*};
-use crate::eventqueue::{EQueue, EQueueInitializer, GameEvent, ServerEvent};
+use rgdext_shared::genericevent::GenericPlayerEvent;
+use crate::eventqueue::{EQueue, GameEvent, ServerEvent};
 
 const AUTHENTICATION_TIMEOUT: f64 = 5.;
 const AUTH_TOKEN_TIMEOUT: f64 = 4.5;
 
 #[derive(GodotClass)]
-#[class(no_init, base=Node)]
+#[class(base=Node)]
 pub struct Server {
     equeue: EQueue,
 
@@ -13,8 +14,7 @@ pub struct Server {
     max_players: i32,
     current_players: i32,
 
-    /// (net_id, timeout timer)
-    pending_players: Vec<(i32, f64)>,
+    // pending_players: Vec<(i32, f64)>,
     /// (token as bytes, pid, token timeout)
     pending_tokens: Vec<(Vec<u8>, i32, f64)>,
 
@@ -25,9 +25,26 @@ pub struct Server {
 
 #[godot_api]
 impl INode for Server {
+    fn init(base: Base<Node>) -> Self {
+        Self {
+            equeue: EQueue::default(),
+
+            port: -1,
+            max_players: -1,
+            current_players: 0,
+
+            // pending_players: Vec::new(),
+            pending_tokens: Vec::new(),
+
+            tick: 0,
+
+            base
+        }
+    }
+
     fn ready(&mut self) {
-        let q = self.base().get_node_as::<EQueueInitializer>("/root/QueueNode");
-        self.set_equeue(q.bind().shared_queue.clone());
+        // let q = self.base().get_node_as::<EQueueInitializer>("/root/QueueNode");
+        // self.set_equeue(q.bind().shared_queue.clone());
 
         // Unreliable config for player movement
         let move_config: Dictionary = vdict! {
@@ -44,7 +61,7 @@ impl INode for Server {
             "channel": 1
         };
 
-        let interaction_config: Dictionary = vdict! {
+        let player_event_config: Dictionary = vdict! {
             "rpc_mode": RpcMode::ANY_PEER,
             "transfer_mode": TransferMode::RELIABLE,
             "call_local": false,
@@ -55,7 +72,7 @@ impl INode for Server {
 
         self.base_mut().rpc_config("pdata", &Variant::from(data_config));
 
-        self.base_mut().rpc_config("pinter", &Variant::from(interaction_config));
+        self.base_mut().rpc_config("pevent", &Variant::from(player_event_config));
 
         let mut multiplayer_peer = ENetMultiplayerPeer::new_gd();
         multiplayer_peer.create_server_ex(self.port).max_clients(self.max_players).done();
@@ -76,18 +93,19 @@ impl INode for Server {
     fn process(&mut self, delta: f64) {
         self.tick += 1;
 
-        let mut mult = self.base().get_multiplayer().unwrap();
-        self.pending_players.retain_mut(|pending_player| {
-            pending_player.1 += delta;
-            if pending_player.1 > AUTHENTICATION_TIMEOUT {
-                mult.get_multiplayer_peer().unwrap().disconnect_peer(pending_player.0);
-                return false;
-            }
-            return true;
-        });
+        // let mut mult = self.base().get_multiplayer().unwrap();
+        // self.pending_players.retain_mut(|pending_player| {
+        //     pending_player.1 += delta;
+        //     if pending_player.1 > AUTHENTICATION_TIMEOUT {
+        //         mult.get_multiplayer_peer().unwrap().disconnect_peer(pending_player.0);
+        //         return false;
+        //     }
+        //     return true;
+        // });
         self.pending_tokens.retain_mut(|pending_token| {
             pending_token.2 += delta;
             if pending_token.2 > AUTH_TOKEN_TIMEOUT {
+                godot_print!("Token {:?} timed out", pending_token.0);
                 return false;
             }
             return true;
@@ -116,10 +134,12 @@ impl INode for Server {
 
 #[godot_api]
 impl Server {
-    // fn get_queue_mut(&mut self) -> &mut EQueue {
-    //     self.equeue.as_mut().unwrap()
-    //     // self.equeue.as_mut().unwrap().clone()
-    // }
+    #[func]
+    fn set_config(&mut self, port: i32, max_players: i32) {
+        // self.equeue = EQueue::default();
+        self.port = port;
+        self.max_players = max_players;
+    }
 
     pub fn set_equeue(&mut self, e: EQueue) {
         godot_print!("Set equeue to: {}", e.to_string());
@@ -136,7 +156,7 @@ impl Server {
                 max_players,
                 current_players: 0,
 
-                pending_players: Vec::new(),
+                // pending_players: Vec::new(),
                 pending_tokens: Vec::new(),
 
                 tick: 0,
@@ -176,22 +196,6 @@ impl Server {
             .send_auth(net_id, &GString::from("ok").to_ascii_buffer());
     }
 
-    #[func]
-    fn peer_connected(&mut self, net_id: i32) {
-        godot_print!("connected: {net_id}");
-        self.current_players += 1;
-    }
-
-    #[func]
-    fn peer_disconnected(&mut self, net_id: i32) {
-        {self.equeue.push_game(
-            GameEvent::PlayerDisconnected(net_id)
-        )};
-
-        self.current_players -= 1;
-        godot_print!("disconnected: {net_id}");
-    }
-
     // This is the auth_callback
     #[func]
     fn verify_token(&mut self, net_id: i32, token: PackedByteArray) {
@@ -212,6 +216,22 @@ impl Server {
         }
     }
 
+    #[func]
+    fn peer_connected(&mut self, net_id: i32) {
+        godot_print!("connected: {net_id}");
+        self.current_players += 1;
+    }
+
+    #[func]
+    fn peer_disconnected(&mut self, net_id: i32) {
+        {self.equeue.push_game(
+            GameEvent::PlayerDisconnected(net_id)
+        )};
+
+        self.current_players -= 1;
+        godot_print!("disconnected: {net_id}");
+    }
+
     // #[rpc(any_peer, unreliable_ordered, call_remote, channel=0)]
     #[func]
     fn pmove(&mut self, x: i32, y: i32, speed: i32) {
@@ -222,17 +242,25 @@ impl Server {
     }
 
     #[func]
-    fn pdata(&mut self, _target_net_id: i32) {
+    fn pdata(&mut self, pid: i32) {
         let net_id = self.base().get_multiplayer().unwrap().get_remote_sender_id();
-        godot_print!("Gotten pdata packet from net_id {}", net_id);
+        self.equeue.push_game(
+            GameEvent::PDataRequest{net_id, pid}
+        );
     }
 
     // Player interacts with
     #[func]
-    fn pinter(&mut self, x: i32, y: i32) {
+    fn pevent(&mut self, pevent_bytes: PackedByteArray) {
         let net_id = self.base().get_multiplayer().unwrap().get_remote_sender_id();
-        self.equeue.push_game(
-            GameEvent::PlayerInteract(x, y, net_id)
-        );
+        let pevent = GenericPlayerEvent::from_bytes(pevent_bytes.as_slice());
+        match pevent {
+            GenericPlayerEvent::Interaction{x, y} => {
+                self.equeue.push_game(
+                    GameEvent::PlayerInteract{x, y, net_id}
+                );
+            },
+            GenericPlayerEvent::Err => {},
+        }   
     }
 }

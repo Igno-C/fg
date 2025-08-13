@@ -6,8 +6,8 @@ var tick: int = 0
 var server_name: String
 var first_update: bool = true
 
-@onready var server_node: Server = null
-@onready var manager_node: GameManager = null
+@onready var server_node: Server = get_node("/root/ServerNode")
+@onready var manager_node: GameManager = get_node("/root/ManagerNode")
 
 func _ready() -> void:
 	var config := ConfigFile.new()
@@ -20,6 +20,7 @@ func _ready() -> void:
 	set_name("serverlist")
 	set_target_name("gateway")
 	set_token(auth_token)
+	set_auto_reconnect(true)
 	set_client(port, ip)
 	
 	start_server()
@@ -39,22 +40,15 @@ func update_gateway() -> void:
 		
 		var max_players = server_node.max_players()
 		var realport = server_node.port()
-		rpc_id(1, "update", current_players, max_players, realport, server_name)
+		rpc_id(1, "_update", current_players, max_players, realport, server_name)
 	else:
-		rpc_id(1, "update", current_players)
-
-func _on_manager_ready() -> void:
-	manager_node = get_node("/root/ManagerNode")
-
-func _on_server_ready() -> void:
-	server_node = get_node("/root/ServerNode")
+		rpc_id(1, "_update", current_players)
 
 func _on_peer_connected(_net_id: int) -> void:
 	first_update = true
 	tick = everythismany-1
-	print("tickAUWAUWUAWUA")
 
 @rpc("any_peer", "call_remote", "reliable", 0)
-func update(token: String, pid: int):
+func _update(token: String, pid: int):
 	print("Received connection token from gateway for pid ", pid)
 	server_node.register_token(token, pid)

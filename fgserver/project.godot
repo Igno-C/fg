@@ -18,10 +18,11 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-QueueNode="*res://queue_node.gd"
+ServerNode="*res://server_node.gd"
+ManagerNode="*res://manager_node.gd"
+QueueInitializer="*res://queue_initializer.gd"
 ServerList="*res://server_list.gd"
 DbServer="*res://db_server.gd"
-NodeLoader="*res://node_loader.gd"
 
 [editor]
 

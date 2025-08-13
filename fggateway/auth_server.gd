@@ -19,8 +19,8 @@ func _ready() -> void:
 	set_name("gateway auth")
 	set_target_name("auth")
 	set_token(auth_token)
-	set_client(port, address)
 	set_auto_reconnect(true)
+	set_client(port, address)
 	
 	start_server()
 
