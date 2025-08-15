@@ -1,12 +1,14 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::{BTreeMap, HashMap}, rc::Rc};
 
 use godot::prelude::*;
 use rgdext_shared::playerdata::PlayerData;
 
-use crate::eventqueue::{EQueue, GameEvent, EQueueInitializer};
-use instance::{Instance, player::Player};
+use crate::eventqueue::{EQueue, GameEvent, ServerEvent};
+use instance::{Instance};
+use misc::*;
 
 mod instance;
+mod misc;
 
 #[derive(GodotClass)]
 #[class(base=Node)]
@@ -15,14 +17,20 @@ pub struct GameManager {
 
     /// net_id -> player's current instance pointer
     // player_instances: HashMap<i32, Gd<instance::Instance>>,
-    player_locations: HashMap<i32, (Rc<RefCell<Player>>, Gd<instance::Instance>)>,
-    player_datas: HashMap<i32, Rc<RefCell<PlayerData>>>,
+    player_locations: HashMap<i32, Gd<instance::Instance>>,
+    /// pid -> pdata
+    player_datas: HashMap<i32, PlayerDataEntry>,
     // current_players: i32,
 
     /// mapname -> list of instances
     instances: HashMap<String, Vec<Gd<instance::Instance>>>,
-    /// net_id, pid
-    deferred_datagets: Vec<(i32, i32)>,
+
+    /// pid -> Vec<net_id>
+    /// 
+    /// Holds the pid to net_id mapping for players whose data we're still waiting on
+    datagets: BTreeMap<i32, Vec<i32>>,
+    /// pid -> net_id
+    full_datagets: BTreeMap<i32, i32>,
 
     base: Base<Node>
 }
@@ -36,35 +44,48 @@ impl INode for GameManager {
             player_datas: HashMap::new(),
             // current_players: 0,
             instances: HashMap::new(),
-            deferred_datagets: Vec::new(),
+            datagets: BTreeMap::new(),
+            full_datagets: BTreeMap::new(),
             base
         }
     }
 
     fn ready(&mut self) {
-        // let q = self.base().get_node_as::<EQueueInitializer>("/root/QueueNode");
-        // self.set_equeue(q.bind().shared_queue.clone());
-
         let mut db_server: Gd<Node> = self.base().get_node_as("/root/DbServer");
-        db_server.connect("retrieved", &Callable::from_object_method(&self.to_gd(), "on_db_retrieved"));
+        db_server.connect("retrieved", &Callable::from_object_method(&self.to_gd(), "_on_db_retrieved"));
+        db_server.connect("request_save", &Callable::from_object_method(&self.to_gd(), "_on_save_request"));
         self.base_mut().connect("save", &Callable::from_object_method(&db_server, "save"));
         self.base_mut().connect("retrieve", &Callable::from_object_method(&db_server, "retrieve"));
 
         godot_print!("Game manager node ready.\n");
     }
 
-    fn process(&mut self, _delta: f64) {
-        // let mut equeue = self.equeue.as_mut().unwrap().clone();
-        // let mut eq = equeue.bind_mut();
+    fn process(&mut self, delta: f64) {
+        let mut saves = Vec::with_capacity(10);
+        self.player_datas.retain(|pid, pdata| {
+            match pdata.tick(delta) {
+                DataTickResult::Idle => true,
+                DataTickResult::Save => {
+                    saves.push(*pid);
+                    true
+                },
+                DataTickResult::Timeout => false,
+            }
+        });
+
+        for pid_to_save in saves {
+            self.save_data(pid_to_save, false);
+        }
+
         for e in self.equeue.iter_game() {
             match e {
                 GameEvent::PlayerMove(x, y, speed, net_id) => self.player_move(x, y, speed, net_id),
-                GameEvent::PlayerJoined{net_id, pid} => self.player_joined(net_id),
-                GameEvent::PlayerDisconnected(net_id) => self.player_despawn(net_id),
-                GameEvent::PlayerJoinInstance(mapname, x, y, net_id) => self.player_join_instance(&mapname, x, y, net_id),
+                GameEvent::PlayerJoined{net_id, pid} => self.player_joined(net_id, pid),
+                GameEvent::PlayerDisconnected{net_id} => self.player_despawn(net_id),
+                GameEvent::PlayerJoinInstance{mapname, x, y, net_id} => self.player_join_instance(&mapname, x, y, net_id),
                 GameEvent::PlayerInteract{x, y, net_id} => self.player_interact(x, y, net_id),
-                GameEvent::UpdatedPlayerData{pid} => {},
-                GameEvent::PDataRequest{net_id, pid} => {}
+                // GameEvent::UpdatedPlayerData{pid} => {},
+                GameEvent::PDataRequest{net_id, pid} => self.player_retrieve_data(net_id, pid),
             }
         }
     }
@@ -73,23 +94,10 @@ impl INode for GameManager {
 #[godot_api]
 impl GameManager {
     #[signal]
-    fn retrieve(pid: i32, force_create: bool);
+    fn retrieve(pid: i32, lock: bool);
 
     #[signal]
-    fn save(pid: i32, data: PackedByteArray);
-
-    // #[func]
-    // fn from_config() -> Gd<Self> {
-    //     Gd::from_init_fn(|base| {
-    //         Self {
-    //             equeue: EQueue::default(),
-    //             player_locations: HashMap::new(),
-    //             current_players: 0,
-    //             instances: HashMap::new(),
-    //             base
-    //         }
-    //     })
-    // }
+    fn save(pid: i32, data: PackedByteArray, unlock: bool);
 
     pub fn set_equeue(&mut self, e: EQueue) {
         godot_print!("Set equeue to {}", e.to_string());
@@ -97,32 +105,85 @@ impl GameManager {
     }
 
     #[func]
-    fn on_db_retrieved(&mut self, pid: i32, data: PackedByteArray) {
+    fn _on_save_request(&mut self, pid: i32) {
+        self.save_data(pid, false);
+    }
+
+    #[func]
+    fn _on_db_retrieved(&mut self, pid: i32, data: PackedByteArray) {
+        godot_print!("{:?}", data.as_slice());
+        
         let data = PlayerData::from_bytes(data.as_slice()).unwrap();
 
-        if let Some(pdata) = self.player_datas.get_mut(&pid) {
-            *pdata.borrow_mut() = data;
-            self.equeue.push_game(GameEvent::UpdatedPlayerData{pid});
-            todo!("Something should also happen here");
+        if let Some(dataget) = self.datagets.remove(&pid) {
+            let minimal_data = data.get_minimal().to_bytearray();
+            
+            for net_id in dataget {
+                // Safe to clone because it's CoW
+                self.equeue.push_server(ServerEvent::PlayerDataResponse{data: minimal_data.clone(), pid, target_net_id: net_id});
+            }
+        }
+
+        let new_entry = if let Some(net_id) = self.full_datagets.remove(&pid) {
+            // This is where the player truly joins the server and the Player object is created
+            self.equeue.push_server(ServerEvent::PlayerDataResponse{data: data.to_bytearray(), pid, target_net_id: net_id});
+            
+            let pdata = Rc::new(RefCell::new(data));
+            let mut instance = self.get_instance(&pdata.borrow().location);
+            instance.bind_mut().spawn_player(pdata.clone(), net_id);
+            PlayerDataEntry::new_with_id(pdata, net_id)
         }
         else {
-            self.player_datas.insert(pid, Rc::new(RefCell::new(data)));
+            // Otherwise, hold the entry until it times out
+            let pdata = Rc::new(RefCell::new(data));
+
+            PlayerDataEntry::new(pdata)
+        };
+
+        // Store the data entry
+        if let Some(pdata) = self.player_datas.get_mut(&pid) {
+            *pdata = new_entry;
+        }
+        else {
+            self.player_datas.insert(pid, new_entry);
+        };
+    }
+
+    // fn retrieve_data(&mut self, pid: i32, lock: bool) {
+        
+    // }
+
+    fn save_data(&mut self, pid: i32, unlock: bool) {
+        if let Some(pdata) = self.player_datas.get(&pid) {
+            let data = pdata.data.borrow().to_bytearray();
+            self.signals().save().emit(pid, &data, unlock);
+        }
+        else {
+            godot_error!("Tried to save pid {pid} while it's missing data");
         }
     }
 
-    fn retrieve(&mut self, pid: i32, force_create: bool) {
-        self.signals().retrieve().emit(pid, force_create);
+    fn player_retrieve_data(&mut self, net_id: i32, pid: i32) {
+        if let Some(pdata) = self.player_datas.get(&pid) {
+            let data = pdata.data.borrow().to_bytearray();
+            self.equeue.push_server(ServerEvent::PlayerDataResponse{data, pid, target_net_id: net_id});
+        }
+        else {
+            // If already waiting for the data from database, net_id to the waiting list
+            // Otherwise, create new waiting list and do a new retrieval
+            if let Some(waitlist) = self.datagets.get_mut(&pid) {
+                waitlist.push(net_id);
+            }
+            else {
+                self.datagets.insert(pid, vec![net_id]);
+                self.signals().retrieve().emit(pid, false);
+            }
+        }
     }
 
-    fn save(&mut self, pid: i32) {
-        
-    }
-
+    // Opens a new instance with the given mapname, adds it to instance repository, returns a pointer to it
     fn start_instance(&mut self, mapname: &str) -> Gd<Instance> {
         let mut inst = instance::Instance::new(mapname, self.equeue.clone());
-        // let mut i = inst.bind_mut();
-        // i.mapname = mapname.to_string();
-        // std::mem::drop(i);
         inst.bind_mut().mapname = mapname.to_string();
         
         // Map is loaded on node's _ready
@@ -142,33 +203,21 @@ impl GameManager {
 
     /// Directly tied to GameEvent::PlayerMove
     fn player_move(&mut self, x: i32, y: i32, speed: i32, net_id: i32) {
-        if let Some((player, _i)) = self.player_locations.get_mut(&net_id) {
-            player.borrow_mut().set_next_move(x, y, speed);
+        if let Some(i) = self.player_locations.get_mut(&net_id) {
+            i.bind_mut().player_move(x, y, speed, net_id);
         }
     }
 
     // PlayerData is needed in here, it's passed to the instance
     // Sets up pointer to player's instance, rest is handled by the instance itself
-    fn player_joined(&mut self, net_id: i32) {
-        // Currently just creating new player data and player position
-        // In the future, this will be fetched first
-        let mut data = PlayerData::default();
-        data.name = net_id.to_string();
-        // data.location = "map1".to_string();
-        let x = 0; let y = 0;
+    fn player_joined(&mut self, net_id: i32, pid: i32) {
+        self.full_datagets.insert(pid, net_id);
 
-        let player = Player::new_rc(data, x, y, "map1");
-
-        // Spawn the player on the instance
-        // self.connect_player_to_map(mapname, net_id);
-        let mut instance = self.get_instance(&player.borrow().data.location);
-        instance.bind_mut().spawn_player(player.clone(), x, y, net_id);
-        self.player_locations.insert(net_id, (player, instance));
-        // self.current_players += 1;
+        self.signals().retrieve().emit(pid, true);
     }
 
     fn player_despawn(&mut self, net_id: i32) {
-        if let Some((_, instance)) = self.player_locations.get_mut(&net_id) {
+        if let Some(instance) = self.player_locations.get_mut(&net_id) {
             instance.bind_mut().despawn_player(net_id);
         }
         self.player_locations.remove(&net_id);
@@ -196,9 +245,12 @@ impl GameManager {
     fn player_join_instance(&mut self, mapname: &str, x: i32, y: i32, net_id: i32) {
         let mut new_instance = self.get_instance(mapname);
         
-        self.player_locations.entry(net_id).and_modify(|(p, old_instance)| {
-            old_instance.bind_mut().despawn_player(net_id);
-            new_instance.bind_mut().spawn_player(p.clone(), x, y, net_id);
+        self.player_locations.entry(net_id).and_modify(|old_instance| {
+            let data = old_instance.bind_mut().despawn_player(net_id);
+            let mut b = data.borrow_mut();
+            b.x = x; b.y = y;
+            drop(b);
+            new_instance.bind_mut().spawn_player(data, net_id);
             *old_instance = new_instance;
 
         });
@@ -208,7 +260,7 @@ impl GameManager {
     }
 
     fn player_interact(&mut self, x: i32, y: i32, net_id: i32) {
-        if let Some((_, instance)) = self.player_locations.get_mut(&net_id) {
+        if let Some(instance) = self.player_locations.get_mut(&net_id) {
             instance.bind_mut().handle_interaction(x, y, net_id);
         }
     }

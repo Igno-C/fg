@@ -55,7 +55,7 @@ impl INode for Server {
         };
 
         let data_config: Dictionary = vdict! {
-            "rpc_mode": RpcMode::AUTHORITY,
+            "rpc_mode": RpcMode::ANY_PEER,
             "transfer_mode": TransferMode::RELIABLE,
             "call_local": false,
             "channel": 1
@@ -122,10 +122,11 @@ impl INode for Server {
                         vslice![x, y, speed, net_id]
                     );
                 },
-                ServerEvent::UpdatePlayer(container, net_id, target_net_id) => {
-                    // godot_print!("Pdata for {net_id} sent to {target_net_id}");
-                    
-                    self.base_mut().rpc_id(target_net_id.into(), "pdata", vslice![container.as_slice(), net_id]);
+                ServerEvent::PlayerDataResponse{data, pid, target_net_id} => {
+                    self.base_mut().rpc_id(target_net_id.into(), "pdata", vslice![data, pid]);
+                },
+                ServerEvent::PlayerAfkDisconnect{net_id} => {
+                    self.base().get_multiplayer().unwrap().get_multiplayer_peer().unwrap().disconnect_peer(net_id);
                 },
             }
         };
@@ -225,7 +226,7 @@ impl Server {
     #[func]
     fn peer_disconnected(&mut self, net_id: i32) {
         {self.equeue.push_game(
-            GameEvent::PlayerDisconnected(net_id)
+            GameEvent::PlayerDisconnected{net_id}
         )};
 
         self.current_players -= 1;

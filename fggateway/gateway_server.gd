@@ -15,7 +15,7 @@ func _ready() -> void:
 	var port: int = config.get_value("Gateway", "port")
 	var max_users: int = config.get_value("Gateway", "max_users")
 	set_name("gateway")
-	set_target_name("game")
+	set_target_name("user")
 	set_server(port, max_users)
 	
 	start_server()
@@ -45,19 +45,22 @@ func _on_auth_response(net_id: int, pid: int) -> void:
 		var waiter: GatewayWaiter = waitinglist[net_id]
 		waiter.authenticate(pid)
 		rpc_id(net_id, "log_in", true)
-		gateway_db_server.create_new_player(pid, waiter.username)
 	else:
 		print("Login failed for ", net_id)
 		rpc_id(net_id, "log_in", false)
 		waitinglist[net_id].time = 0.
 
-func _on_account_create_response(net_id: int, valid: bool) -> void:
+func _on_account_create_response(net_id: int, pid: int) -> void:
+	var waiter: GatewayWaiter = waitinglist[net_id]
+	var valid: bool = pid != -1
 	if valid:
-		print("Created account for ", net_id)
+		print("Created account for %s with pid %s" % [net_id, pid])
+		gateway_db_server.create_new_player(pid, waiter.username)
 	else:
-		print("Failed account creation for ", net_id)
+		print("Failed account creation for  %s" % net_id)
 	rpc_id(net_id, "create_account", valid)
-	waitinglist[net_id].time = 0.
+	waiter.time = 0.
+	waiter.authenticated = false
 
 @rpc("any_peer", "call_remote", "reliable", 0)
 func log_in(username: String, password: String) -> void:
@@ -103,4 +106,4 @@ func join_server(server_name: String) -> void:
 	var params = server_list.join_server(server_name, waiter.pid)
 	print("Attempting to join user ", net_id, " to server ", server_name)
 	print(params)
-	rpc_id(net_id, "join_server", params.ip, params.port, params.token)
+	rpc_id(net_id, "join_server", waiter.pid, params.ip, params.port, params.token)

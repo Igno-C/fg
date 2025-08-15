@@ -121,8 +121,7 @@ func _peer_disconnected(net_id: int) -> void:
 
 @rpc("any_peer", "call_remote", "reliable", 0)
 func log_in(authenticated: bool) -> void:
-	#succeeded = true
-	#network.disconnect_peer(1)
+	succeeded = true
 	if authenticated:
 		print("Successful login")
 		success.emit()
@@ -146,7 +145,8 @@ func get_server_list(servers: Array[Dictionary]) -> void:
 	got_server_list.emit(servers)
 
 @rpc("any_peer", "call_remote", "reliable", 1)
-func join_server(address: String, port: int, token: String) -> void:
+func join_server(pid: int, address: String, port: int, token: String) -> void:
 	succeeded = true
 	await get_tree().create_timer(0.5).timeout
-	joined_server.emit(token, address, port)
+	joined_server.emit(pid, address, port, token)
+	network.disconnect_peer(1)

@@ -4,7 +4,7 @@ func _ready() -> void:
 	var config := ConfigFile.new()
 	config.load("res://gateway.cfg")
 	var address: String = config.get_value("GatewayDb", "address")
-	var port = config.get_value("GatewayDbr", "port")
+	var port = config.get_value("GatewayDb", "port")
 	var auth_token = config.get_value("GatewayDb", "auth_token")
 	
 	set_name("gateway-db")

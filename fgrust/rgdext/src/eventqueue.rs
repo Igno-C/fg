@@ -125,10 +125,12 @@ impl EQueue {
 pub enum ServerEvent {
     /// x, y, speed, net_id, target_net_id
     PlayerMoveResponse(i32, i32, i32, i32, i32),
-    /// pdata, net_id, target_net_id
+    /// pdata, pid, target_net_id
     /// 
     /// Uses a reference counted pointer to only store one copy of the data for each event
-    UpdatePlayer(std::rc::Rc<Vec<u8>>, i32, i32),
+    PlayerDataResponse{data: PackedByteArray, pid: i32, target_net_id: i32},
+    PlayerAfkDisconnect{net_id: i32}
+    // UpdatePlayers{data: PackedByteArray, pid: i32, target_net_ids: Vec<i32>}
 }
 
 pub enum GameEvent {
@@ -137,13 +139,13 @@ pub enum GameEvent {
     /// net_id
     PlayerJoined{net_id: i32, pid: i32},
     /// net_id
-    PlayerDisconnected(i32),
+    PlayerDisconnected{net_id: i32},
     /// name, x, y, net_id
     /// 
     /// Joins player to an instance by the given map name
-    PlayerJoinInstance(String, i32, i32, i32),
+    PlayerJoinInstance{mapname: String, x: i32, y: i32, net_id: i32},
     /// x, y, net_id
     PlayerInteract{x: i32, y: i32, net_id: i32},
-    UpdatedPlayerData{pid: i32},
+    // UpdatedPlayerData{pid: i32},
     PDataRequest{net_id: i32, pid: i32}
 }

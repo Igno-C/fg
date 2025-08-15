@@ -13,10 +13,11 @@ pub struct Player {
     // pub speed: i32,
 
     pub ticks_since_move: i32,
+    pub speed: i32,
     pub nextmove: Option<(i32, i32, i32)>,
     pub nextnextmove: Option<(i32, i32, i32)>,
 
-    pub data: PlayerData,
+    pub data: Rc<RefCell<PlayerData>>,
     // pub location: String,
     /// Flag that signals that players should be sent updated player data
     pub data_just_updated: bool,
@@ -48,27 +49,37 @@ impl Player {
         self.nextmove = self.nextnextmove.take();
     }
 
-    pub fn get_pos_mut(&mut self) -> (&mut i32, &mut i32, &mut i32) {
-        (&mut self.data.x, &mut self.data.y, &mut self.data.speed)
+    // pub fn get_pos_mut(&mut self) -> (&mut i32, &mut i32, &mut i32) {
+    //     (&mut self.data.x, &mut self.data.y, &mut self.data.speed)
+    // }
+
+    pub fn get_pos(&self) -> (i32, i32, i32) {
+        let b = self.data.borrow();
+        (b.x, b.y, self.speed)
     }
 
-    pub fn x(&self) -> i32 {self.data.x}
+    pub fn set_pos(&mut self, x: i32, y: i32, speed: i32) {
+        let mut b = self.data.borrow_mut();
+        b.x = x; b.y = y; self.speed = speed;
+    }
 
-    pub fn y(&self) -> i32 {self.data.y}
+    pub fn x(&self) -> i32 {self.data.borrow().x}
 
-    pub fn speed(&self) -> i32 {self.data.speed}
+    pub fn y(&self) -> i32 {self.data.borrow().y}
+
+    pub fn speed(&self) -> i32 {self.speed}
 
     /// Has data_just_updated = true and just_spawned = true
-    pub fn new(mut data: PlayerData, startx: i32, starty: i32, location: impl ToString) -> Self {
-        data.location = location.to_string();
+    pub fn new(data: Rc<RefCell<PlayerData>>, location: impl ToString) -> Self {
+        data.borrow_mut().location = location.to_string();
         // let startx = 0;
         // let starty = 0;
         Self {
             // x: startx,
             // y: starty,
-            // speed: 0,
 
             ticks_since_move: 0,
+            speed: 0,
             nextmove: None,
             nextnextmove: None,
             // location: location.to_string(),
@@ -80,12 +91,12 @@ impl Player {
         }
     }
 
-    pub fn new_rc(data: PlayerData, startx: i32, starty: i32, location: impl ToString) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Player::new(data, startx, starty, location)))
-    }
+    // pub fn new_rc(data: PlayerData, startx: i32, starty: i32, location: impl ToString) -> Rc<RefCell<Self>> {
+    //     Rc::new(RefCell::new(Player::new(data, startx, starty, location)))
+    // }
 
     pub fn set_location(&mut self, location: impl ToString) {
-        self.data.location = location.to_string();
+        self.data.borrow_mut().location = location.to_string();
     }
 }
 

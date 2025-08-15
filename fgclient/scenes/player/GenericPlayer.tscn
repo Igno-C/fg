@@ -23,6 +23,7 @@ offset_right = 49.0
 offset_bottom = 50.0
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
+visible = false
 z_index = 1
 texture = ExtResource("2_gth5n")
 centered = false

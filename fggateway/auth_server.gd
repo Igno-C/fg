@@ -8,7 +8,7 @@ extends ServerConnector
 var config := ConfigFile.new()
 
 signal response(net_id: int, valid: bool)
-signal created_response(net_id: int, valid: bool)
+signal created_response(net_id: int, pid: int)
 
 func _ready() -> void:
 	config.load("res://gateway.cfg")
@@ -42,6 +42,6 @@ func _authenticate(net_id: int, pid: int) -> void:
 func _create_account(net_id: int, new_pid: int) -> void:
 	print("Created account for ", net_id, " with pid ", new_pid)
 	if new_pid == -1:
-		created_response.emit(net_id, false)
+		created_response.emit(net_id, new_pid)
 	else:
-		created_response.emit(net_id, true)
+		created_response.emit(net_id, new_pid)

@@ -1,7 +1,7 @@
 extends ServerConnector
 
 signal retrieved(pid: int, data: PackedByteArray)
-signal request_save(pid: int)
+signal request_save(pid: int) 
 
 func _ready() -> void:
 	var config := ConfigFile.new()
@@ -18,15 +18,16 @@ func _ready() -> void:
 	
 	start_server()
 
-func save(pid: int, data: PackedByteArray) -> void:
-	rpc_id(1, "_save", pid, data)
+func save(pid: int, data: PackedByteArray, unlock: bool) -> void:
+	rpc_id(1, "_save", pid, data, unlock)
 
-func retrieve(pid: int, force_create: bool) -> void:
-	rpc_id(1, "_retrieve", pid, force_create)
+func retrieve(pid: int, lock: bool) -> void:
+	rpc_id(1, "_retrieve", pid, lock)
 
 @rpc("any_peer", "call_remote", "reliable", 0)
 func _save(pid: int):
-	request_save.emit(pid)
+	pass
+	#request_save.emit(pid)
 
 @rpc("any_peer", "call_remote", "reliable", 0)
 func _retrieve(pid: int, data: PackedByteArray):

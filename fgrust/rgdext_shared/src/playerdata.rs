@@ -92,7 +92,7 @@ pub struct PlayerData {
     pub location: String,
     pub x: i32,
     pub y: i32,
-    pub speed: i32,
+    // pub speed: i32,
 
     placeholder: Option<i32>,
 }
@@ -116,7 +116,6 @@ impl PlayerData {
             location: "".to_string(),
             x: 0,
             y: 0,
-            speed: 0,
 
             placeholder: None
         }
@@ -134,7 +133,6 @@ impl PlayerData {
 
             x: self.x,
             y: self.y,
-            speed: self.speed,
 
             placeholder: None,
         }
@@ -149,9 +147,72 @@ impl Default for PlayerData {
 
             x: 0,
             y: 0,
-            speed: 0,
 
             placeholder: Default::default()
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_test() {
+        let pdata = PlayerData {
+            name: "123123".into(),
+            location: "map1".into(),
+            x: 0,
+            y: 0,
+            placeholder: None,
+        };
+        println!("{:?}", pdata.to_bytes());
+    }
+
+    #[test]
+    fn test_null_function() {
+        let null_data = PlayerData::null();
+        let bytes = null_data.to_bytes();
+        let decoded = PlayerData::from_bytes(&bytes).unwrap();
+        
+        assert!(decoded.is_null());
+    }
+
+    #[test]
+    fn test_round_trip_consistency() {
+        let test_cases = vec![
+            PlayerData {
+                name: "Player1".to_string(),
+                location: "map1".to_string(),
+                x: 10,
+                y: 20,
+                placeholder: Some(100),
+            },
+            PlayerData {
+                name: "Player2".to_string(),
+                location: "map2".to_string(),
+                x: -10,
+                y: -20,
+                placeholder: None,
+            },
+            PlayerData {
+                name: "Player3".to_string(),
+                location: "map3".to_string(),
+                x: 0,
+                y: 0,
+                placeholder: Some(0),
+            },
+        ];
+
+        for original in test_cases {
+            let bytes = original.to_bytes();
+            let decoded = PlayerData::from_bytes(&bytes).unwrap();
+            
+            assert_eq!(original.name, decoded.name);
+            assert_eq!(original.location, decoded.location);
+            assert_eq!(original.x, decoded.x);
+            assert_eq!(original.y, decoded.y);
+            assert_eq!(original.placeholder, decoded.placeholder);
         }
     }
 }

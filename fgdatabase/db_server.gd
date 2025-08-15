@@ -52,7 +52,7 @@ func create_new_player(pid: int, username: String) -> void:
 	})
 
 @rpc("any_peer", "call_remote", "reliable", 0)
-func _save(pid: int, data: PackedByteArray) -> void:
+func _save(pid: int, data: PackedByteArray, unlock: bool = false) -> void:
 	var server_id := multiplayer.get_remote_sender_id()
 	if not db.query_with_bindings(save_query, [data, pid]):
 		print("Failed to save data for pid ", pid, ": ", db.error_message)

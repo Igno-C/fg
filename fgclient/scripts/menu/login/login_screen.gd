@@ -7,7 +7,7 @@ extends Control
 @onready var server_list: Control = get_node("ServerList")
 @onready var loading_box: Control = get_node("LoadingBox")
 
-signal login_success(token: String, ip: String, port: int)
+signal login_success(pid: int, ip: String, port: int, token: String)
 
 
 func _ready() -> void:
@@ -34,11 +34,11 @@ func _ready() -> void:
 	#print(sl)
 	#server_list.populate(sl)
 
-func _on_joined_server(token: String, ip: String, port: int) -> void:
+func _on_joined_server(pid: int, ip: String, port: int, token: String) -> void:
 	for child in get_children():
 		child.visible = false
 	loading_box.visible = true
-	login_success.emit(token, ip, port)
+	login_success.emit(pid, ip, port, token)
 
 func open_login() -> void:
 	login_box.show_box(true)

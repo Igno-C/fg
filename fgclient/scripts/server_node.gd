@@ -14,7 +14,7 @@ signal data_update(data: PlayerContainer, net_id: int)
 
 #signal net_id_update(net_id: int)
 
-signal connection_success(net_id: int)
+signal connection_success
 signal connection_failure(err: String)
 
 func _ready() -> void:
@@ -25,20 +25,20 @@ func _ready() -> void:
 		"channel": 0,
 	}
 	var data_config: Dictionary = {
-		"rpc_mode": MultiplayerAPI.RPCMode.RPC_MODE_AUTHORITY,
+		"rpc_mode": MultiplayerAPI.RPCMode.RPC_MODE_ANY_PEER,
 		"transfer_mode": MultiplayerPeer.TransferMode.TRANSFER_MODE_RELIABLE,
 		"call_local": false,
 		"channel": 1,
 	}
-	var interaction_config: Dictionary = {
-		"rpc_mode": MultiplayerAPI.RPCMode.RPC_MODE_AUTHORITY,
+	var player_event_config: Dictionary = {
+		"rpc_mode": MultiplayerAPI.RPCMode.RPC_MODE_ANY_PEER,
 		"transfer_mode": MultiplayerPeer.TransferMode.TRANSFER_MODE_RELIABLE,
 		"call_local": false,
 		"channel": 2,
 	}
 	rpc_config("pmove", move_config)
 	rpc_config("pdata", data_config)
-	rpc_config("pevent", interaction_config)
+	rpc_config("pevent", player_event_config)
 	
 	var mult = multiplayer as SceneMultiplayer
 	mult.auth_callback = auth_callback
@@ -51,7 +51,7 @@ func _ready() -> void:
 	
 	mult.connection_failed.connect(connection_failure.emit.bind("Error: Failed to connect to server"))
 
-func connect_to_server(t: String, ip: String, port: int) -> void:
+func connect_to_server(ip: String, port: int, t: String) -> void:
 	network = ENetMultiplayerPeer.new()
 	
 	var err := network.create_client(ip, port)
@@ -79,7 +79,7 @@ func _process(delta: float) -> void:
 
 func _on_peer_connected(net_id: int) -> void:
 	print("Successful connect as ", net_id)
-	connection_success.emit(net_id)
+	connection_success.emit()
 
 func _on_peer_disconnected(net_id: int) -> void:
 	print("Disconnect as ", net_id)
@@ -96,6 +96,9 @@ func send_move(x: int, y: int, speed: int) -> void:
 
 func send_event(event: GenericEvent) -> void:
 	rpc_id(1, "pevent", event.to_bytearray())
+
+func send_data_request(pid: int) -> void:
+	rpc_id(1, "pdata", pid)
 
 func pevent() -> void:
 	pass

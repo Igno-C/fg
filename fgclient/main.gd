@@ -8,8 +8,7 @@ extends Node
 @onready var server: Server = get_node("/root/ServerNode")
 @onready var gateway: GatewayServer = get_node("/root/GatewayServer")
 
-#var player: PlayerEntity = null
-
+var your_pid: int = -1
 # Dictionary from net_ids to player entities
 
 func _ready() -> void:
@@ -30,12 +29,13 @@ func spawn_loginscreen(with_err: String = "") -> void:
 		ls.login_box.set_err(with_err)
 	ui_node.add_child(ls)
 
-func _on_login_success(token: String, ip: String, port: int) -> void:
-	server.connect_to_server(token, ip, port)
+func _on_login_success(pid: int, ip: String, port: int, token: String) -> void:
+	server.connect_to_server(ip, port, token)
+	your_pid = pid
 
-func _on_connection_success(net_id: int) -> void:
+func _on_connection_success() -> void:
 	var manager := GameManager.new()
-	manager.player_net_id = net_id
+	manager.player_pid = your_pid
 	manager.name = "GameManager"
 	
 	game_node.add_child(manager)
