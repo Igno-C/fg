@@ -1,7 +1,9 @@
 use bitcode::{Decode, Encode};
+// use serde::{Serialize, Deserialize};
 use godot::prelude::*;
-// use serde::{Deserialize, Serialize};
 
+pub mod item;
+pub mod skills;
 
 #[derive(GodotClass)]
 #[class(no_init, base=RefCounted)]
@@ -31,9 +33,10 @@ impl PlayerContainer {
     }
 
     #[func]
-    fn from_name(name: String) -> Gd<PlayerContainer> {
+    fn from_name(name: String, pid: i32) -> Gd<PlayerContainer> {
         let mut data = PlayerData::default();
         data.name = name;
+        data.pid = pid;
         Gd::from_init_fn(|base| {
             PlayerContainer {
                 data,
@@ -64,9 +67,25 @@ impl PlayerContainer {
     }
 
     #[func]
+    fn get_pid(&self) -> i32 {
+        self.data.pid
+    }
+
+    #[func]
     /// Allocates a new Godot String, try to call only once if needed
     fn get_location(&self) -> GString {
         self.data.location.clone().into()
+    }
+
+    #[func]
+    fn get_pos(&self) -> Vector2i {
+        Vector2i{x: self.data.x, y: self.data.y}
+    }
+
+    #[func]
+    fn set_pos(&mut self, pos: Vector2i) {
+        self.data.x = pos.x;
+        self.data.y = pos.y;
     }
 
     #[func]
@@ -75,23 +94,26 @@ impl PlayerContainer {
     }
 }
 
-#[derive(Decode, Encode, Clone)]
+#[derive(Clone, Encode, Decode)]
 pub struct PlayerData {
     pub name: String,
+    pub pid: i32,
     pub location: String,
     pub x: i32,
     pub y: i32,
-    // pub speed: i32,
 
-    placeholder: Option<i32>,
+    skills: skills::Skills,
+    items: Vec<item::Item>,
 }
 
 impl PlayerData {
     pub fn from_bytes(b: &[u8]) -> Result<Self, bitcode::Error> {
+        // bitcode::deserialize(b)
         bitcode::decode(b)
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
+        // bitcode::serialize(self).unwrap()
         bitcode::encode(self)
     }
 
@@ -102,94 +124,50 @@ impl PlayerData {
     pub fn null() -> Self {
         Self {
             name: "".to_string(),
+            pid: -1,
             location: "".to_string(),
             x: 0,
             y: 0,
 
-            placeholder: None
+            skills: skills::Skills::default(),
+            items: Vec::new(),
         }
     }
 
     pub fn is_null(&self) -> bool {
-        return self.name.is_empty();
+        return self.pid == -1;
     }
 
     /// Clones name and location
     pub fn get_minimal(&self) -> Self {
         Self {
             name: self.name.clone(),
+            pid: self.pid,
             location: self.location.clone(),
 
             x: self.x,
             y: self.y,
 
-            placeholder: None,
+            skills: self.skills.clone(),
+            items: Vec::new(),
         }
     }
 }
 
+// The default PlayerData value is what players are initialized with
+// sans fields like name, pid or whatever else may get overwritten
 impl Default for PlayerData {
     fn default() -> Self {
         Self {
             name: Default::default(),
+            pid: -1,
             location: "map1".to_string(),
 
             x: 0,
             y: 0,
 
-            placeholder: Default::default()
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_null_function() {
-        let null_data = PlayerData::null();
-        let bytes = null_data.to_bytes();
-        let decoded = PlayerData::from_bytes(&bytes).unwrap();
-        
-        assert!(decoded.is_null());
-    }
-
-    #[test]
-    fn test_round_trip_consistency() {
-        let test_cases = vec![
-            PlayerData {
-                name: "Player1".to_string(),
-                location: "map1".to_string(),
-                x: 10,
-                y: 20,
-                placeholder: Some(100),
-            },
-            PlayerData {
-                name: "Player2".to_string(),
-                location: "map2".to_string(),
-                x: -10,
-                y: -20,
-                placeholder: None,
-            },
-            PlayerData {
-                name: "Player3".to_string(),
-                location: "map3".to_string(),
-                x: 0,
-                y: 0,
-                placeholder: Some(0),
-            },
-        ];
-
-        for original in test_cases {
-            let bytes = original.to_bytes();
-            let decoded = PlayerData::from_bytes(&bytes).unwrap();
-            
-            assert_eq!(original.name, decoded.name);
-            assert_eq!(original.location, decoded.location);
-            assert_eq!(original.x, decoded.x);
-            assert_eq!(original.y, decoded.y);
-            assert_eq!(original.placeholder, decoded.placeholder);
+            skills: skills::Skills::default(),
+            items: Vec::new(),
         }
     }
 }

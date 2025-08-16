@@ -8,12 +8,9 @@ use rgdext_shared::playerdata::PlayerData;
 // #[derive(GodotClass)]
 // #[class(base=Node)]
 pub struct Player {
-    // pub x: i32,
-    // pub y: i32,
-    // pub speed: i32,
-
     pub ticks_since_move: i32,
     pub speed: i32,
+    // These two essentially make a 2-move buffer
     pub nextmove: Option<(i32, i32, i32)>,
     pub nextnextmove: Option<(i32, i32, i32)>,
 
@@ -69,15 +66,14 @@ impl Player {
 
     pub fn speed(&self) -> i32 {self.speed}
 
+    pub fn pid(&self) -> i32 {self.data.borrow().pid}
+
     /// Has data_just_updated = true and just_spawned = true
-    pub fn new(data: Rc<RefCell<PlayerData>>, location: impl ToString) -> Self {
-        data.borrow_mut().location = location.to_string();
+    pub fn new(data: Rc<RefCell<PlayerData>>) -> Self {
+        // data.borrow_mut().location = location.to_string();
         // let startx = 0;
         // let starty = 0;
         Self {
-            // x: startx,
-            // y: starty,
-
             ticks_since_move: 0,
             speed: 0,
             nextmove: None,

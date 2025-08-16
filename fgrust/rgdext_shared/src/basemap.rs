@@ -3,12 +3,12 @@ use godot::{prelude::*, classes::TileMapLayer};
 #[derive(GodotClass)]
 #[class(base=Node)]
 pub struct BaseMap {
-    pub drop_graphics: bool,
+    // pub drop_graphics: bool,
 
     /// Impacts how entities load
     on_server: bool,
 
-    col_array: Option<CollisionArray>,
+    col_array: CollisionArray,
     
     base: Base<Node>
 }
@@ -17,10 +17,10 @@ pub struct BaseMap {
 impl INode for BaseMap {
     fn init(base: Base<Node>) -> Self {
         Self {
-            drop_graphics: false,
+            // drop_graphics: false,
             on_server: false,
 
-            col_array: None,
+            col_array: CollisionArray::new(),
             
             base
         }
@@ -30,27 +30,37 @@ impl INode for BaseMap {
     fn ready(&mut self) {
         self.bake_collisions();
 
-        if self.drop_graphics {
+        if self.on_server {
             self.drop_graphics();
+        }
+        else {
+            self.drop_entities();
         }
     }
 }
 
 #[godot_api]
 impl BaseMap {
+    /// Has to be run before adding to scenetree on the server
+    /// 
+    /// Changes how the map loads - drops all graphics, leaves just entities
+    pub fn on_server(&mut self) {
+        self.on_server = true;
+    }
+
     #[func]
     pub fn get_at(&self, x: i32, y: i32) -> bool {
-        self.col_array.as_ref().unwrap().get_at(x, y)
+        self.col_array.get_at(x, y)
     }
 
     #[func]
     pub fn set_at(&mut self, x: i32, y: i32, to: bool) {
-        self.col_array.as_mut().unwrap().set_at(x, y, to);
+        self.col_array.set_at(x, y, to);
     }
 
     /// If the collisions were already extracted, they're set to null here
     fn bake_collisions(&mut self) {
-        self.col_array = Some(self.extract_collisions());
+        self.col_array = self.extract_collisions();
     }
 
     /// Also drops the collision tilemap.
@@ -66,7 +76,6 @@ impl BaseMap {
         let mut col_array = CollisionArray::from_used_rect(&rect);
 
         let cells = tmap_c.get_used_cells();
-        // let col_array = self.col_array.as_mut().unwrap();
         for cell in cells.iter_shared() {
             col_array.set_at(cell.x, cell.y, true);
         }
@@ -76,15 +85,20 @@ impl BaseMap {
         col_array
     }
 
-    // Drops all child nodes except for one named 'Entities'
+    /// Drops all child nodes except for one named 'Entities'
     fn drop_graphics(&mut self) {
         for mut child in self.base().get_children().iter_shared() {
             if child.get_name() != "Entities".into() {
                 child.queue_free();
             }
         }
-        // Since the graphics get dropped, must be on a server
-        self.on_server = true;
+    }
+
+    /// Drops the node named 'Entities'
+    fn drop_entities(&mut self) {
+        if let Some(mut enode) = self.base().get_node_or_null("Entities") {
+            enode.queue_free();
+        }
     }
 }
 

@@ -18,12 +18,13 @@ var currently_moving: bool = false
 # 'by' is the distance that should be travelled
 func real_lerp(to: Vector2, from: Vector2, by: float) -> Vector2:
 	var delta: Vector2 = to - from
-	var movement: Vector2 = delta.normalized() * by
+	var deltabs: Vector2 = delta.abs()
+	var maximum: float = maxf(deltabs.x, deltabs.y)
+	var movement: Vector2 = (delta / maximum) * by
 	if movement.length_squared() > delta.length_squared():
 		movement = delta
 	return from + movement
 
-# newx: int, newy: int
 func move(newpos: Vector2i, newspeed: int) -> void:
 	var delta = newpos - pos
 	if delta.x == 1: direction = Dir.RIGHT

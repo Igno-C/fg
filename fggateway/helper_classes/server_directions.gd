@@ -8,4 +8,4 @@ func _init(i: String, p: int, t: String) -> void:
 	ip = i; port = p; token = t
 
 func _to_string() -> String:
-	return "%s:%s, with token %s"
+	return "%s:%s, with token %s" % [ip, port, token]

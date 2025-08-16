@@ -97,12 +97,11 @@ impl INode for Instance {
             if let Some((nextx, nexty, nextspeed)) = *p.peek_next_move() {
                 // godot_print!("Trying move to {}, {} with speed {}", nextx, nexty, nextspeed);
                 if p.ticks_since_move >= nextspeed {
-                    let (x, y, speed) = p.get_pos();
+                    let (x, y, _speed) = p.get_pos();
 
                     if (x - nextx).abs() == 1 || (y - nexty).abs() == 1 {
                         if !col_array.get_at(nextx, nexty) {
                             p.set_pos(nextx, nexty, nextspeed);
-                            // *x = nextx; *y = nexty; *speed = nextspeed;
 
                             // 0 ticks since last move indicates a move just happened
                             p.ticks_since_move = 0;
@@ -114,9 +113,9 @@ impl INode for Instance {
 
                     p.eat_next_move();
                 }
-                else {
-                    // godot_print!("Not yet - {}/{}", p.ticks_since_move, nextspeed);
-                }
+                // else {
+                //     // godot_print!("Not yet - {}/{}", p.ticks_since_move, nextspeed);
+                // }
             }
         }
 
@@ -153,9 +152,10 @@ impl INode for Instance {
 
             // Pushing server events for every player movement (or initial position after spawning)
             if p.ticks_since_move == 0 {
-                self.equeue.push_server(ServerEvent::PlayerMoveResponse(p.x(), p.y(), p.speed(), *net_id, *net_id));
+                let (x, y, speed) = p.get_pos();
+                self.equeue.push_server(ServerEvent::PlayerMoveResponse{x, y , speed, pid: p.pid(), target_net_id: *net_id});
                 for target_net_id in self.get_adjacent_players(*net_id) {
-                    self.equeue.push_server(ServerEvent::PlayerMoveResponse(p.x(), p.y(), p.speed(), *net_id, *target_net_id));
+                    self.equeue.push_server(ServerEvent::PlayerMoveResponse{x, y, speed, pid: p.pid(), target_net_id: *target_net_id});
                 }
             }
 
@@ -211,8 +211,8 @@ impl Instance {
         let map: Gd<PackedScene> = m.cast();
         let mut mapnode = map.instantiate_as::<BaseMap>();
 
-        mapnode.bind_mut().drop_graphics = true;
-        mapnode.bind_mut().base_mut().set_name(&self.mapname);
+        mapnode.bind_mut().on_server();
+        mapnode.set_name(&self.mapname);
         let col_array = mapnode.bind_mut().extract_collisions();
         self.col_array = col_array;
         self.base_mut().add_child(&mapnode);
@@ -221,9 +221,10 @@ impl Instance {
     }
 
     pub fn spawn_player(&mut self, data: Rc<RefCell<PlayerData>>, net_id: i32) {
+        data.borrow_mut().location = self.mapname.clone();
         // let pnode = Player::new(data, x, y);
         // let player = Rc::new(RefCell::new(pnode));
-        let player = Player::new(data, &self.mapname);
+        let player = Player::new(data);
         // let mut p = player.borrow_mut();
         // p.just_spawned = true;
         // p.data_just_updated = true;

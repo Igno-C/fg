@@ -3,10 +3,12 @@ extends ServerConnector
 const db_path: String = "res://data/gamedb.db"
 var db := SQLite.new()
 
-const data_query: String = "SELECT data FROM pdata WHERE pid = ?"
+const data_query: String = "SELECT data, lock_id FROM pdata WHERE pid = ?"
+const check_lock_query: String = "SELECT lock_id FROM pdata WHERE pid = ?"
 const save_query: String = "UPDATE pdata SET data = ? WHERE pid = ?"
 const lock_query: String = "UPDATE pdata SET lock_id = ? WHERE pid = ?"
 const unlock_all_query: String = "UPDATE pdata SET lock_id = null WHERE lock_id = ?"
+const unlock_absolutely_all_query: String = "UPDATE pdata SET lock_id = null"
 
 #var servers: Dictionary
 
@@ -29,6 +31,7 @@ func _ready() -> void:
 	db.verbosity_level = SQLite.VerbosityLevel.NORMAL
 	db.path = db_path
 	create_or_open_db()
+	db.query(unlock_absolutely_all_query)
 	
 	var gateway_db_server: Node = get_node("/root/GatewayDbServer")
 	gateway_db_server.create_new_player.connect(create_new_player)
@@ -54,7 +57,7 @@ func create_new_player(pid: int, username: String) -> void:
 	db.insert_row("pdata", {
 		"pid": pid,
 		"lock_id": null,
-		"data": PlayerContainer.from_name(username).to_bytearray()
+		"data": PlayerContainer.from_name(username, pid).to_bytearray()
 	})
 
 func unlock_all(net_id: int) -> void:
@@ -72,11 +75,16 @@ func _on_server_disconnect(net_id: int) -> void:
 @rpc("any_peer", "call_remote", "reliable", 0)
 func _save(pid: int, data: PackedByteArray, unlock: bool = false) -> void:
 	var server_id := multiplayer.get_remote_sender_id()
-	db.query_with_bindings(data_query, [pid])
+	db.query_with_bindings(check_lock_query, [pid])
 	
-	var lock = db.query_result_by_reference[0].get("lock_id")
+	if db.query_result_by_reference.is_empty():
+		print("Tried to save to nonexistend pid: ", pid)
+		return
+	
+	var lock = db.query_result_by_reference[0]["lock_id"]
 	if lock != server_id:
 		print("Server %s tried to save to entry with pid %s it didn't have lock to" % [server_id, pid])
+		print("Lock: ", lock)
 		return
 	
 	if unlock:

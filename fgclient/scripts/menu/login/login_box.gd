@@ -31,6 +31,10 @@ func show_box(show: bool) -> void:
 		err_label.text = ""
 		set_enabled(true)
 
+func _on_password_submitted(text: String) -> void:
+	err_label.text = ""
+	pressed.emit(username.text, text)
+
 func _on_button_pressed() -> void:
 	err_label.text = ""
 	pressed.emit(username.text, password.text)

@@ -106,11 +106,11 @@ impl INode for Server {
         let iter = self.equeue.iter_server();
         for e in iter {
             match e {
-                ServerEvent::PlayerMoveResponse(x, y, speed, net_id, target_net_id) => {
+                ServerEvent::PlayerMoveResponse{x, y, speed, pid, target_net_id} => {
                     self.base_mut().rpc_id(
                         target_net_id.into(),
                         "pmove",
-                        vslice![x, y, speed, net_id]
+                        vslice![x, y, speed, pid]
                     );
                 },
                 ServerEvent::PlayerDataResponse{data, pid, target_net_id} => {

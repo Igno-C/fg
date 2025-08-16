@@ -124,7 +124,7 @@ impl EQueue {
 
 pub enum ServerEvent {
     /// x, y, speed, net_id, target_net_id
-    PlayerMoveResponse(i32, i32, i32, i32, i32),
+    PlayerMoveResponse{x: i32, y: i32, speed: i32, pid: i32, target_net_id: i32},
     /// pdata, pid, target_net_id
     /// 
     /// Uses a reference counted pointer to only store one copy of the data for each event

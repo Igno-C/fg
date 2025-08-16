@@ -40,12 +40,14 @@ impl INode for GameManager {
     fn init(base: Base<Node>) -> Self {
         Self {
             equeue: EQueue::default(),
+
             player_locations: HashMap::new(),
             player_datas: HashMap::new(),
-            // current_players: 0,
             instances: HashMap::new(),
+
             datagets: BTreeMap::new(),
             full_datagets: BTreeMap::new(),
+
             base
         }
     }
@@ -74,6 +76,7 @@ impl INode for GameManager {
         });
 
         for pid_to_save in saves {
+            godot_print!("Saving data for pid {pid_to_save}");
             self.save_data(pid_to_save, false);
         }
 
@@ -197,9 +200,7 @@ impl GameManager {
 
     /// Directly tied to GameEvent::PlayerMove
     fn player_move(&mut self, x: i32, y: i32, speed: i32, net_id: i32) {
-        godot_print!("PASSA");
         if let Some(i) = self.player_locations.get_mut(&net_id) {
-            godot_print!("OBO");
             i.bind_mut().player_move(x, y, speed, net_id);
         }
     }
