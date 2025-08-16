@@ -129,22 +129,16 @@ pub enum ServerEvent {
     /// 
     /// Uses a reference counted pointer to only store one copy of the data for each event
     PlayerDataResponse{data: PackedByteArray, pid: i32, target_net_id: i32},
-    PlayerAfkDisconnect{net_id: i32}
+    PlayerForceDisconnect{net_id: i32}
     // UpdatePlayers{data: PackedByteArray, pid: i32, target_net_ids: Vec<i32>}
 }
 
 pub enum GameEvent {
-    /// deltax, deltay, speed, net_id
-    PlayerMove(i32, i32, i32, i32),
-    /// net_id
+    PlayerMove{x: i32, y: i32, speed: i32, net_id: i32},
     PlayerJoined{net_id: i32, pid: i32},
-    /// net_id
     PlayerDisconnected{net_id: i32},
-    /// name, x, y, net_id
-    /// 
     /// Joins player to an instance by the given map name
     PlayerJoinInstance{mapname: String, x: i32, y: i32, net_id: i32},
-    /// x, y, net_id
     PlayerInteract{x: i32, y: i32, net_id: i32},
     // UpdatedPlayerData{pid: i32},
     PDataRequest{net_id: i32, pid: i32}

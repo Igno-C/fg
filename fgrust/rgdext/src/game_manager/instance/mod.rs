@@ -152,16 +152,20 @@ impl INode for Instance {
             }
 
             // Pushing server events for every player movement (or initial position after spawning)
-            // if p.ticks_since_move == 0 || p.just_spawned {
-            //     self.equeue.push_server(ServerEvent::PlayerMoveResponse(p.x(), p.y(), p.speed(), *net_id, *net_id));
-            //     for target_net_id in self.get_adjacent_players(*net_id) {
-            //         self.equeue.push_server(ServerEvent::PlayerMoveResponse(p.x(), p.y(), p.speed(), *net_id, *target_net_id));
-            //     }
-            // }
+            if p.ticks_since_move == 0 {
+                self.equeue.push_server(ServerEvent::PlayerMoveResponse(p.x(), p.y(), p.speed(), *net_id, *net_id));
+                for target_net_id in self.get_adjacent_players(*net_id) {
+                    self.equeue.push_server(ServerEvent::PlayerMoveResponse(p.x(), p.y(), p.speed(), *net_id, *target_net_id));
+                }
+            }
 
             // p.data_just_updated = false;
             // p.just_spawned = false;
         }
+
+        // for p in self.players.values_mut() {
+        //     p.just_spawned = false;
+        // }
 
         // Player data is nulled when they're despawned
         // This cleans up the list after sending the null packets

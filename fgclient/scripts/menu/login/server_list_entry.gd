@@ -1,6 +1,6 @@
 extends PanelContainer
 
-@onready var icon: TextureRect = get_node("MarginContainer/GridContainer/TextureRect")
+#@onready var icon: TextureRect = get_node("MarginContainer/GridContainer/TextureRect")
 @onready var label: Label = get_node("MarginContainer/GridContainer/Label")
 @onready var button: Button = get_node("MarginContainer/GridContainer/Button")
 var server_name: String
@@ -23,7 +23,7 @@ func _ready() -> void:
 	label.text = server_name
 	
 	var idx = clampi(server_load - 1, 0, load_icons.size() - 1)
-	icon.texture = load_icons[idx]
+	#icon.texture = load_icons[idx]
 	button.icon = load_icons[idx]
 
 func with_server(name: String, load: int) -> void:

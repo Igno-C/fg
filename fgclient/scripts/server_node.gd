@@ -86,6 +86,7 @@ func _on_peer_disconnected(net_id: int) -> void:
 	connection_failure.emit("Disconnected from server")
 
 func send_move(x: int, y: int, speed: int) -> void:
+	print("Sending move")
 	if FAKELAG_ENABLED:
 		var timestamp := Time.get_ticks_msec()
 		print("Fakelagging...")

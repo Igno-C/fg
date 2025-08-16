@@ -5,6 +5,8 @@ var db := SQLite.new()
 
 const data_query: String = "SELECT data FROM pdata WHERE pid = ?"
 const save_query: String = "UPDATE pdata SET data = ? WHERE pid = ?"
+const lock_query: String = "UPDATE pdata SET lock_id = ? WHERE pid = ?"
+const unlock_all_query: String = "UPDATE pdata SET lock_id = null WHERE lock_id = ?"
 
 #var servers: Dictionary
 
@@ -21,6 +23,8 @@ func _ready() -> void:
 	set_server(port, max_servers)
 	
 	start_server()
+	
+	multiplayer.peer_disconnected.connect(_on_server_disconnect)
 	
 	db.verbosity_level = SQLite.VerbosityLevel.NORMAL
 	db.path = db_path
@@ -39,6 +43,7 @@ func create_or_open_db() -> void:
 		print("Database didn't exist, initializing")
 		var game_db_dict := {
 			"pid": {"data_type":"int", "primary_key": true, "not_null": true, "unique": true},
+			"lock_id": {"data_type":"int"},
 			"data": {"data_type":"blob", "not_null": true},
 		}
 		
@@ -48,29 +53,56 @@ func create_or_open_db() -> void:
 func create_new_player(pid: int, username: String) -> void:
 	db.insert_row("pdata", {
 		"pid": pid,
+		"lock_id": null,
 		"data": PlayerContainer.from_name(username).to_bytearray()
 	})
+
+func unlock_all(net_id: int) -> void:
+	db.query_with_bindings(unlock_all_query, [net_id])
+
+func unlock_pid(pid: int) -> void:
+	db.query_with_bindings(lock_query, [null, pid])
+
+func lock_pid(pid: int, net_id: int) -> void:
+	db.query_with_bindings(lock_query, [net_id, pid])
+
+func _on_server_disconnect(net_id: int) -> void:
+	unlock_all(net_id)
 
 @rpc("any_peer", "call_remote", "reliable", 0)
 func _save(pid: int, data: PackedByteArray, unlock: bool = false) -> void:
 	var server_id := multiplayer.get_remote_sender_id()
-	if not db.query_with_bindings(save_query, [data, pid]):
-		print("Failed to save data for pid ", pid, ": ", db.error_message)
+	db.query_with_bindings(data_query, [pid])
+	
+	var lock = db.query_result_by_reference[0].get("lock_id")
+	if lock != server_id:
+		print("Server %s tried to save to entry with pid %s it didn't have lock to" % [server_id, pid])
+		return
+	
+	if unlock:
+		unlock_pid(pid)
+		
+	db.query_with_bindings(save_query, [data, pid])
 
-# force_create means that if pid doesn't have data, it should be created
 @rpc("any_peer", "call_remote", "reliable", 0)
 func _retrieve(pid: int, lock: bool = false) -> void:
 	var server_id := multiplayer.get_remote_sender_id()
 	db.query_with_bindings(data_query, [pid])
 	
-	var data := PackedByteArray()
 	if db.query_result_by_reference.is_empty():
-		rpc_id(server_id, "_retrieve", pid, data)
-		#if force_create:
-			#create_new_playerdata(pid)
-			#db.query_with_bindings(data_query, [pid])
-			#data = db.query_result_by_reference[0]["data"]
-	else:
-		data = db.query_result_by_reference[0]["data"]
+		rpc_id(server_id, "_retrieve", pid, PackedByteArray())
+		return
+	var entry: Dictionary = db.query_result_by_reference[0]
+	
+	var lock_id = entry.get("lock_id")
+	if lock:
+		if lock_id == null:
+			print("Locking entry for pid %s by server %s" % [pid, server_id])
+			lock_pid(pid, server_id)
+		else:
+			print("Server %s attempted lock on already locked entry for pid %s" % [server_id, pid])
+	
+	var data: PackedByteArray = entry["data"]
+	print("Retrieved data: ", data)
 	
 	rpc_id(server_id, "_retrieve", pid, data)

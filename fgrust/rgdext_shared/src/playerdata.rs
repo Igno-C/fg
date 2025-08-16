@@ -11,17 +11,6 @@ pub struct PlayerContainer {
     base: Base<RefCounted>
 }
 
-// #[godot_api]
-// impl IRefCounted for PlayerContainer {
-//     fn init(base: Base<RefCounted>) -> Self {
-//         PlayerContainer {
-//             data: PlayerData::default(),
-
-//             base
-//         }
-//     }
-// }
-
 #[godot_api]
 impl PlayerContainer {
     #[func]
@@ -156,18 +145,6 @@ impl Default for PlayerData {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_test() {
-        let pdata = PlayerData {
-            name: "123123".into(),
-            location: "map1".into(),
-            x: 0,
-            y: 0,
-            placeholder: None,
-        };
-        println!("{:?}", pdata.to_bytes());
-    }
 
     #[test]
     fn test_null_function() {

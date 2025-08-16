@@ -93,15 +93,6 @@ impl INode for Server {
     fn process(&mut self, delta: f64) {
         self.tick += 1;
 
-        // let mut mult = self.base().get_multiplayer().unwrap();
-        // self.pending_players.retain_mut(|pending_player| {
-        //     pending_player.1 += delta;
-        //     if pending_player.1 > AUTHENTICATION_TIMEOUT {
-        //         mult.get_multiplayer_peer().unwrap().disconnect_peer(pending_player.0);
-        //         return false;
-        //     }
-        //     return true;
-        // });
         self.pending_tokens.retain_mut(|pending_token| {
             pending_token.2 += delta;
             if pending_token.2 > AUTH_TOKEN_TIMEOUT {
@@ -125,7 +116,7 @@ impl INode for Server {
                 ServerEvent::PlayerDataResponse{data, pid, target_net_id} => {
                     self.base_mut().rpc_id(target_net_id.into(), "pdata", vslice![data, pid]);
                 },
-                ServerEvent::PlayerAfkDisconnect{net_id} => {
+                ServerEvent::PlayerForceDisconnect{net_id} => {
                     self.base().get_multiplayer().unwrap().get_multiplayer_peer().unwrap().disconnect_peer(net_id);
                 },
             }
@@ -137,13 +128,12 @@ impl INode for Server {
 impl Server {
     #[func]
     fn set_config(&mut self, port: i32, max_players: i32) {
-        // self.equeue = EQueue::default();
         self.port = port;
         self.max_players = max_players;
     }
 
     pub fn set_equeue(&mut self, e: EQueue) {
-        godot_print!("Set equeue to: {}", e.to_string());
+        // godot_print!("Set equeue to: {}", e.to_string());
         self.equeue = e;
     }
 
@@ -238,7 +228,7 @@ impl Server {
     fn pmove(&mut self, x: i32, y: i32, speed: i32) {
         let net_id = self.base().get_multiplayer().unwrap().get_remote_sender_id();
         self.equeue.push_game(
-            GameEvent::PlayerMove(x, y, speed, net_id)
+            GameEvent::PlayerMove{x, y, speed, net_id}
         );
     }
 

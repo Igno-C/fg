@@ -79,7 +79,7 @@ impl INode for GameManager {
 
         for e in self.equeue.iter_game() {
             match e {
-                GameEvent::PlayerMove(x, y, speed, net_id) => self.player_move(x, y, speed, net_id),
+                GameEvent::PlayerMove{x, y, speed, net_id} => self.player_move(x, y, speed, net_id),
                 GameEvent::PlayerJoined{net_id, pid} => self.player_joined(net_id, pid),
                 GameEvent::PlayerDisconnected{net_id} => self.player_despawn(net_id),
                 GameEvent::PlayerJoinInstance{mapname, x, y, net_id} => self.player_join_instance(&mapname, x, y, net_id),
@@ -100,7 +100,6 @@ impl GameManager {
     fn save(pid: i32, data: PackedByteArray, unlock: bool);
 
     pub fn set_equeue(&mut self, e: EQueue) {
-        godot_print!("Set equeue to {}", e.to_string());
         self.equeue = e;
     }
 
@@ -111,8 +110,6 @@ impl GameManager {
 
     #[func]
     fn _on_db_retrieved(&mut self, pid: i32, data: PackedByteArray) {
-        godot_print!("{:?}", data.as_slice());
-        
         let data = PlayerData::from_bytes(data.as_slice()).unwrap();
 
         if let Some(dataget) = self.datagets.remove(&pid) {
@@ -131,6 +128,7 @@ impl GameManager {
             let pdata = Rc::new(RefCell::new(data));
             let mut instance = self.get_instance(&pdata.borrow().location);
             instance.bind_mut().spawn_player(pdata.clone(), net_id);
+            self.player_locations.insert(net_id, instance);
             PlayerDataEntry::new_with_id(pdata, net_id)
         }
         else {
@@ -148,10 +146,6 @@ impl GameManager {
             self.player_datas.insert(pid, new_entry);
         };
     }
-
-    // fn retrieve_data(&mut self, pid: i32, lock: bool) {
-        
-    // }
 
     fn save_data(&mut self, pid: i32, unlock: bool) {
         if let Some(pdata) = self.player_datas.get(&pid) {
@@ -203,7 +197,9 @@ impl GameManager {
 
     /// Directly tied to GameEvent::PlayerMove
     fn player_move(&mut self, x: i32, y: i32, speed: i32, net_id: i32) {
+        godot_print!("PASSA");
         if let Some(i) = self.player_locations.get_mut(&net_id) {
+            godot_print!("OBO");
             i.bind_mut().player_move(x, y, speed, net_id);
         }
     }
@@ -211,6 +207,12 @@ impl GameManager {
     // PlayerData is needed in here, it's passed to the instance
     // Sets up pointer to player's instance, rest is handled by the instance itself
     fn player_joined(&mut self, net_id: i32, pid: i32) {
+        // A player with this pid is already on the server
+        if self.player_datas.get(&pid).is_some_and(|e| e.net_id().is_some()) {
+            self.equeue.push_server(ServerEvent::PlayerForceDisconnect{net_id});
+            return;
+        }
+
         self.full_datagets.insert(pid, net_id);
 
         self.signals().retrieve().emit(pid, true);
@@ -221,8 +223,6 @@ impl GameManager {
             instance.bind_mut().despawn_player(net_id);
         }
         self.player_locations.remove(&net_id);
-
-        // self.current_players -= 1;
     }
 
     /// Gets the best instance for given map name.
