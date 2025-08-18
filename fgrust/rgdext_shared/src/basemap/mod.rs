@@ -1,4 +1,7 @@
 use godot::{prelude::*, classes::TileMapLayer};
+use spatialhash::SpatialHash;
+
+pub mod spatialhash;
 
 #[derive(GodotClass)]
 #[class(base=Node)]
@@ -60,15 +63,15 @@ impl BaseMap {
 
     /// If the collisions were already extracted, they're set to null here
     fn bake_collisions(&mut self) {
-        self.col_array = self.extract_collisions();
+        self.col_array = self.extract_collisions().0;
     }
 
     /// Also drops the collision tilemap.
-    pub fn extract_collisions(&mut self) -> CollisionArray {
+    pub fn extract_collisions(&mut self) -> (CollisionArray, SpatialHash) {
         // CMap is the expected name of the collision tilemap node
         let mut tmap_c: Gd<TileMapLayer> = match self.base().try_get_node_as::<TileMapLayer>("CMap") {
             Some(map) => map,
-            None => return CollisionArray::new(),
+            None => return (CollisionArray::new(), SpatialHash::default()),
         };
 
         let rect: Rect2i = tmap_c.get_used_rect();
@@ -82,7 +85,7 @@ impl BaseMap {
 
         tmap_c.queue_free();
 
-        col_array
+        (col_array, SpatialHash::from_used_rect_default(&rect))
     }
 
     /// Drops all child nodes except for one named 'Entities'

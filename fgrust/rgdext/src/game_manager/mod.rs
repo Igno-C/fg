@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::{BTreeMap, HashMap}, rc::Rc};
 
 use godot::prelude::*;
-use rgdext_shared::playerdata::PlayerData;
+use rgdext_shared::{genericevent::GenericPlayerEvent, playerdata::PlayerData};
 
 use crate::eventqueue::{EQueue, GameEvent, ServerEvent};
 use instance::{Instance};
@@ -86,9 +86,9 @@ impl INode for GameManager {
                 GameEvent::PlayerJoined{net_id, pid} => self.player_joined(net_id, pid),
                 GameEvent::PlayerDisconnected{net_id} => self.player_despawn(net_id),
                 GameEvent::PlayerJoinInstance{mapname, x, y, net_id} => self.player_join_instance(&mapname, x, y, net_id),
-                GameEvent::PlayerInteract{x, y, net_id} => self.player_interact(x, y, net_id),
-                // GameEvent::UpdatedPlayerData{pid} => {},
-                GameEvent::PDataRequest{net_id, pid} => self.player_retrieve_data(net_id, pid),
+                // GameEvent::PlayerInteract{x, y, net_id} => self.player_interact(x, y, net_id),
+                GameEvent::GenericEvent{event, net_id} => self.handle_generic_event(event, net_id),
+                GameEvent::PDataRequest{pid, net_id} => self.player_retrieve_data(net_id, pid),
             }
         }
     }
@@ -119,14 +119,14 @@ impl GameManager {
             let minimal_data = data.get_minimal().to_bytearray();
             
             for net_id in dataget {
-                // Safe to clone because it's CoW
-                self.equeue.push_server(ServerEvent::PlayerDataResponse{data: minimal_data.clone(), pid, target_net_id: net_id});
+                // Safe to clone PackedByteArray because it's CoW
+                self.equeue.push_server(ServerEvent::PlayerDataResponse{data: minimal_data.clone(), net_id: net_id});
             }
         }
 
         let new_entry = if let Some(net_id) = self.full_datagets.remove(&pid) {
             // This is where the player truly joins the server and the Player object is created
-            self.equeue.push_server(ServerEvent::PlayerDataResponse{data: data.to_bytearray(), pid, target_net_id: net_id});
+            self.equeue.push_server(ServerEvent::PlayerDataResponse{data: data.to_bytearray(), net_id: net_id});
             
             let pdata = Rc::new(RefCell::new(data));
             let mut instance = self.get_instance(&pdata.borrow().location);
@@ -162,8 +162,8 @@ impl GameManager {
 
     fn player_retrieve_data(&mut self, net_id: i32, pid: i32) {
         if let Some(pdata) = self.player_datas.get(&pid) {
-            let data = pdata.data.borrow().to_bytearray();
-            self.equeue.push_server(ServerEvent::PlayerDataResponse{data, pid, target_net_id: net_id});
+            let data = pdata.data.borrow().get_minimal().to_bytearray();
+            self.equeue.push_server(ServerEvent::PlayerDataResponse{data, net_id: net_id});
         }
         else {
             // If already waiting for the data from database, net_id to the waiting list
@@ -221,7 +221,8 @@ impl GameManager {
 
     fn player_despawn(&mut self, net_id: i32) {
         if let Some(instance) = self.player_locations.get_mut(&net_id) {
-            instance.bind_mut().despawn_player(net_id);
+            let data = instance.bind_mut().despawn_player(net_id);
+            self.signals().save().emit(data.borrow().pid, &data.borrow().to_bytearray(), true);
         }
         self.player_locations.remove(&net_id);
     }
@@ -260,9 +261,14 @@ impl GameManager {
         // new_instance.bind_mut().spawn_player(data, x, y, net_id);
     }
 
-    fn player_interact(&mut self, x: i32, y: i32, net_id: i32) {
-        if let Some(instance) = self.player_locations.get_mut(&net_id) {
-            instance.bind_mut().handle_interaction(x, y, net_id);
+    fn handle_generic_event(&mut self, event: GenericPlayerEvent, net_id: i32) {
+        match event {
+            GenericPlayerEvent::Interaction{x, y} => {
+                if let Some(instance) = self.player_locations.get_mut(&net_id) {
+                    instance.bind_mut().handle_interaction(x, y, net_id);
+                }
+            },
+            GenericPlayerEvent::Err => {},
         }
     }
 }

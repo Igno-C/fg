@@ -1,59 +1,7 @@
 use godot::prelude::*;
-use rgdext_shared::playerdata::PlayerData;
+use rgdext_shared::genericevent::{GenericPlayerEvent, GenericServerResponse};
 use std::{rc::Rc, cell::RefCell};
 
-// #[derive(GodotClass)]
-// #[class(base=Node)]
-// pub struct EventQueue {
-//     server_events: Vec<ServerEvent>,
-//     game_events: Vec<GameEvent>,
-
-//     base: Base<Node>
-// }
-
-// #[godot_api]
-// impl INode for EventQueue {
-//     fn init(base: Base<Node>) -> Self {
-//         Self {
-//             server_events: Vec::new(),
-//             game_events: Vec::new(),
-//             base
-//         }
-//     }
-
-//     fn ready(&mut self) {
-//         godot_print!("Queue node ready.\n");
-//     }
-// }
-
-// #[godot_api]
-// impl EventQueue {
-//     pub fn push_server(&mut self, e: ServerEvent) {
-//         self.server_events.push(e);
-//     }
-
-//     pub fn push_game(&mut self, e: GameEvent) {
-//         self.game_events.push(e);
-//     }
-
-//     pub fn iter_server(&mut self) -> ConsumingIterator<ServerEvent> {
-//         ConsumingIterator(&mut self.server_events)
-//     }
-
-//     pub fn iter_game(&mut self) -> ConsumingIterator<GameEvent> {
-//         ConsumingIterator(&mut self.game_events)
-//     }
-// }
-
-// pub struct ConsumingIterator<'a, T>(&'a mut Vec<T>);
-
-// impl<'a, T> Iterator for ConsumingIterator<'a, T> {
-//     type Item = T;
-
-//     fn next(&mut self) -> Option<Self::Item> {
-//         self.0.pop()
-//     }
-// }
 
 #[derive(GodotClass)]
 #[class(base=Node)]
@@ -123,14 +71,11 @@ impl EQueue {
 }
 
 pub enum ServerEvent {
-    /// x, y, speed, net_id, target_net_id
-    PlayerMoveResponse{x: i32, y: i32, speed: i32, pid: i32, target_net_id: i32},
-    /// pdata, pid, target_net_id
-    /// 
-    /// Uses a reference counted pointer to only store one copy of the data for each event
-    PlayerDataResponse{data: PackedByteArray, pid: i32, target_net_id: i32},
-    PlayerForceDisconnect{net_id: i32}
-    // UpdatePlayers{data: PackedByteArray, pid: i32, target_net_ids: Vec<i32>}
+    PlayerMoveResponse{x: i32, y: i32, speed: i32, pid: i32, net_id: i32},
+    PlayerDataResponse{data: PackedByteArray, net_id: i32},
+    PlayerForceDisconnect{net_id: i32},
+
+    GenericResponse{response: GenericServerResponse, net_id: i32}
 }
 
 pub enum GameEvent {
@@ -139,7 +84,7 @@ pub enum GameEvent {
     PlayerDisconnected{net_id: i32},
     /// Joins player to an instance by the given map name
     PlayerJoinInstance{mapname: String, x: i32, y: i32, net_id: i32},
-    PlayerInteract{x: i32, y: i32, net_id: i32},
-    // UpdatedPlayerData{pid: i32},
-    PDataRequest{net_id: i32, pid: i32}
+    GenericEvent{event: GenericPlayerEvent, net_id: i32},
+    /// net_id of the user requesting, pid of the user whose data is requested
+    PDataRequest{pid: i32, net_id: i32}
 }

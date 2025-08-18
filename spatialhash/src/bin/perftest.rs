@@ -5,40 +5,28 @@ use spatialhash::{*, benchmark::benchmark};
 
 
 struct TestObject {
-    data: Rc<RefCell<OInner>>
-}
-
-struct OInner {
-    x: i32,
-    y: i32,
-    dummy_data: [u8; 1000],
+    pos: (i32, i32),
+    id: i32,
 }
 
 impl TestObject {
-    fn new(x: i32, y: i32) -> TestObject {
+    fn new(x: i32, y: i32, id: i32) -> TestObject {
         TestObject {
-            data: Rc::new(RefCell::new(
-                OInner{
-                    x,
-                    y,
-                    dummy_data: [0; 1000]
-                }
-            ))
+            pos: (x, y),
+            id
         }
     }
 }
 
 impl Positioned for TestObject {
     fn get_pos(&self) -> (i32, i32) {
-        let b = self.data.borrow();
-        (b.x, b.y)
+        self.pos
     }
 }
 
 impl Positionable for TestObject {
     fn set_pos(&mut self, x: i32, y: i32) {
-        let mut b = self.data.borrow_mut();
-        b.x = x; b.y = y;
+        self.pos = (x, y)
     }
 }
 
@@ -58,33 +46,41 @@ fn main() {
         30,
         2
     );
+
+    full_spatial_benchmark(
+        500,
+        500,
+        50,
+        30,
+        3
+    );
 }
 
 
 fn full_spatial_benchmark(num_objects: usize, num_checks: usize, check_size: i32, max_distance: i32, seed: u64) {
     println!("\n# Max distance {}, {} objects, seeded random uniform distribution, {}x{} map:", max_distance, num_objects, check_size, check_size);
-    let positions = generate_uniform(num_objects, check_size, seed);
+    let spawn_positions = generate_uniform_id(num_objects, check_size, seed);
     let swap_positions = generate_uniform(num_objects, check_size, seed+50000);
     let check_positions = generate_uniform(num_checks, check_size, seed+1000000000);
     
     let mut lazy = LazyChecker::new(max_distance);
-    let mut field1 = SpatialFieldChecker::new(max_distance, (-check_size/2, -check_size/2), (check_size/2 - 1, check_size/2 - 1), 1);
-    let mut field2 = SpatialFieldChecker::new(max_distance/2, (-check_size/2, -check_size/2), (check_size/2 - 1, check_size/2 - 1), 2);
-    let mut field3 = SpatialFieldChecker::new(max_distance/3, (-check_size/2, -check_size/2), (check_size/2 - 1, check_size/2 - 1), 3);
+    let mut field1 = SpatialHash::new(max_distance, (-check_size/2, -check_size/2), (check_size/2 - 1, check_size/2 - 1), 1);
+    let mut field2 = SpatialHash::new(max_distance/2, (-check_size/2, -check_size/2), (check_size/2 - 1, check_size/2 - 1), 2);
+    let mut field3 = SpatialHash::new(max_distance/3, (-check_size/2, -check_size/2), (check_size/2 - 1, check_size/2 - 1), 3);
 
     benchmark("Lazy object insertion", || {
-        for pos in positions.iter() {
-            lazy.insert(TestObject::new(pos.0, pos.1));
+        for pos in spawn_positions.iter() {
+            lazy.insert(TestObject::new(pos.0, pos.1, pos.2));
         }
     });
     benchmark("Field object insertion", || {
-        for pos in positions.iter() {
-            field1.insert(TestObject::new(pos.0, pos.1));
+        for pos in spawn_positions.iter() {
+            field1.insert(pos.2, (pos.0, pos.1));
         }
     });
-    for pos in positions.iter() {
-        field2.insert(TestObject::new(pos.0, pos.1));
-        field3.insert(TestObject::new(pos.0, pos.1));
+    for pos in spawn_positions.iter() {
+        field2.insert(pos.2, (pos.0, pos.1));
+        field3.insert(pos.2, (pos.0, pos.1));
     }
 
     benchmark(format!("Lazy distance checking"), || {
@@ -153,18 +149,27 @@ fn full_spatial_benchmark(num_objects: usize, num_checks: usize, check_size: i32
         }
     });
     benchmark("Field object moving", || {
-        for pos in positions.iter() {
-            field1.insert(TestObject::new(pos.0, pos.1));
+        for (pos, newpos) in spawn_positions.iter().zip(swap_positions.iter()) {
+            field1.update_pos(pos.2, (pos.0, pos.1), *newpos);
         }
     });
 }
 
 // fn field_benchmark()
 
-/// Generates randomly with seed, in range -range..range
 fn generate_uniform(length: usize, range: i32, seed: u64) -> Vec<(i32, i32)> {
     let mut rng = StdRng::seed_from_u64(seed);
     (0..length)
         .map(|_| (rng.random_range(-range/2..range/2), rng.random_range(-range/2..range/2)))
+        .collect()
+}
+
+/// Generates randomly with seed, in range -range..range
+/// 
+/// (x, y, id)
+fn generate_uniform_id(length: usize, range: i32, seed: u64) -> Vec<(i32, i32, i32)> {
+    let mut rng = StdRng::seed_from_u64(seed);
+    (0..length)
+        .map(|_| (rng.random_range(-range/2..range/2), rng.random_range(-range/2..range/2), rng.random()))
         .collect()
 }

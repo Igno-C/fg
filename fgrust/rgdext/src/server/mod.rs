@@ -106,19 +106,19 @@ impl INode for Server {
         let iter = self.equeue.iter_server();
         for e in iter {
             match e {
-                ServerEvent::PlayerMoveResponse{x, y, speed, pid, target_net_id} => {
-                    self.base_mut().rpc_id(
-                        target_net_id.into(),
-                        "pmove",
-                        vslice![x, y, speed, pid]
-                    );
+                ServerEvent::PlayerMoveResponse{x, y, speed, pid, net_id} => {
+                    self.base_mut().rpc_id(net_id.into(), "pmove", vslice![x, y, speed, pid]);
                 },
-                ServerEvent::PlayerDataResponse{data, pid, target_net_id} => {
-                    self.base_mut().rpc_id(target_net_id.into(), "pdata", vslice![data, pid]);
+                ServerEvent::PlayerDataResponse{data, net_id} => {
+                    self.base_mut().rpc_id(net_id.into(), "pdata", vslice![data]);
                 },
                 ServerEvent::PlayerForceDisconnect{net_id} => {
                     self.base().get_multiplayer().unwrap().get_multiplayer_peer().unwrap().disconnect_peer(net_id);
                 },
+                ServerEvent::GenericResponse{response, net_id} => {
+                    let data = response.to_bytearray();
+                    self.base_mut().rpc_id(net_id.into(), "pevent", vslice![data]);
+                }
             }
         };
     }
@@ -244,14 +244,9 @@ impl Server {
     #[func]
     fn pevent(&mut self, pevent_bytes: PackedByteArray) {
         let net_id = self.base().get_multiplayer().unwrap().get_remote_sender_id();
-        let pevent = GenericPlayerEvent::from_bytes(pevent_bytes.as_slice());
-        match pevent {
-            GenericPlayerEvent::Interaction{x, y} => {
-                self.equeue.push_game(
-                    GameEvent::PlayerInteract{x, y, net_id}
-                );
-            },
-            GenericPlayerEvent::Err => {},
-        }   
+        let event = GenericPlayerEvent::from_bytes(pevent_bytes.as_slice());
+        self.equeue.push_game(
+            GameEvent::GenericEvent{net_id, event}
+        );
     }
 }

@@ -73,10 +73,32 @@ impl GenericResponse {
             }
         })
     }
+
+    #[constant]
+    const RESPONSE_ERR: i32 = -1;
+    #[constant]
+    const RESPONSE_LOAD_MAP: i32 = 0;
+
+    #[func]
+    pub fn response_type(&self) -> i32 {
+        match &self.response {
+            GenericServerResponse::LoadMap{mapname: _} => Self::RESPONSE_LOAD_MAP,
+            GenericServerResponse::Err => Self::RESPONSE_ERR,
+        }
+    }
+
+    #[func]
+    pub fn as_load_map(&self) -> String {
+        match &self.response {
+            GenericServerResponse::LoadMap{mapname} => mapname.clone(),
+            _ => "".to_string(),
+        }
+    }
 }
 
 #[derive(Decode, Encode, Clone)]
 pub enum GenericServerResponse {
+    LoadMap{mapname: String},
     Err,
 }
 

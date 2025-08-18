@@ -46,10 +46,10 @@ impl PlayerContainer {
     }
 
     #[func]
-    fn null() -> Gd<PlayerContainer> {
+    fn null(pid: i32) -> Gd<PlayerContainer> {
         Gd::from_init_fn(|base| {
             PlayerContainer {
-                data: PlayerData::null(),
+                data: PlayerData::null(pid),
                 base
             }
         })
@@ -94,7 +94,7 @@ impl PlayerContainer {
     }
 }
 
-#[derive(Clone, Encode, Decode)]
+#[derive(Clone, Encode, Decode, Debug)]
 pub struct PlayerData {
     pub name: String,
     pub pid: i32,
@@ -121,10 +121,10 @@ impl PlayerData {
         PackedByteArray::from(self.to_bytes())
     }
 
-    pub fn null() -> Self {
+    pub fn null(pid: i32) -> Self {
         Self {
             name: "".to_string(),
-            pid: -1,
+            pid,
             location: "".to_string(),
             x: 0,
             y: 0,
@@ -135,7 +135,7 @@ impl PlayerData {
     }
 
     pub fn is_null(&self) -> bool {
-        return self.pid == -1;
+        return self.location.is_empty();
     }
 
     /// Clones name and location

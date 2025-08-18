@@ -50,12 +50,17 @@ impl Player {
     //     (&mut self.data.x, &mut self.data.y, &mut self.data.speed)
     // }
 
-    pub fn get_pos(&self) -> (i32, i32, i32) {
+    pub fn get_full_pos(&self) -> (i32, i32, i32) {
         let b = self.data.borrow();
         (b.x, b.y, self.speed)
     }
 
-    pub fn set_pos(&mut self, x: i32, y: i32, speed: i32) {
+    pub fn get_pos(&self) -> (i32, i32) {
+        let b = self.data.borrow();
+        (b.x, b.y)
+    }
+
+    pub fn set_full_pos(&mut self, x: i32, y: i32, speed: i32) {
         let mut b = self.data.borrow_mut();
         b.x = x; b.y = y; self.speed = speed;
     }

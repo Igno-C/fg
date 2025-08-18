@@ -1,5 +1,3 @@
-use std::ops::Index;
-
 pub mod benchmark;
 
 pub trait Positioned {
@@ -124,42 +122,75 @@ impl<T: Positioned + Positionable> LazyChecker<T> {
 //     }
 // }
 
-pub struct SpatialFieldChecker<T: Positioned + Positionable> {
+// use godot::{builtin::Rect2i, global::godot_print};
+
+
+// pub const GRID_SIZE: i32 = 8;
+// pub const CHECK_RADIUS: i32 = 3;
+
+fn get_smallpos(distance: i32, pos: (i32, i32)) -> (i32, i32) {
+    (pos.0.div_euclid(distance), pos.1.div_euclid(distance))
+}
+
+#[derive(Default)]
+pub struct SpatialHash {
     distance: i32,
     topleft: (i32, i32),
     width: usize,
     check_radius: i32,
     // bottomright: (i32, i32),
 
-    objects: Vec<Vec<T>>
+    map: Vec<Vec<i32>>
 }
 
-impl<T: Positioned + Positionable> SpatialFieldChecker<T> {
+impl SpatialHash {
+    // pub fn from_used_rect(rect: &Rect2i) -> Self {
+    //     let rect_topleft = (rect.position.x, rect.position.y);
+    //     let topleft = get_smallpos(rect_topleft);
+    //     let rect_bottomright = (rect.end().x, rect.end().y);
+    //     let bottomright = get_smallpos(rect_bottomright);
+
+    //     let width = (bottomright.0 - topleft.0) as usize + 1;
+    //     let height = (bottomright.1 - topleft.1) as usize + 1;
+
+    //     let mut map = Vec::with_capacity(width*height);
+    //     for _ in 0..width*height {
+    //         map.push(Vec::new());
+    //     }
+
+    //     Self {
+    //         topleft,
+    //         width,
+    //         map
+    //     }
+    // }
+
+    
+
     pub fn new(distance: i32, topleft: (i32, i32), bottomright: (i32, i32), check_radius: i32) -> Self {
-        let smalltopleft = (topleft.0.div_euclid(distance), topleft.1.div_euclid(distance));
-        let smallbottomright = (bottomright.0.div_euclid(distance), bottomright.1.div_euclid(distance));
+        let rect_topleft = topleft;
+        let topleft = get_smallpos(distance, rect_topleft);
+        let rect_bottomright = bottomright;
+        let bottomright = get_smallpos(distance, rect_bottomright);
 
-        let xsize = (smallbottomright.0 - smalltopleft.0) as usize + 1;
-        let ysize = (smallbottomright.1 - smalltopleft.1) as usize + 1;
+        let width = (bottomright.0 - topleft.0) as usize + 1;
+        let height = (bottomright.1 - topleft.1) as usize + 1;
 
-
-        let mut objects = Vec::with_capacity(xsize);
-        for _ in 0..(xsize*ysize) {
-            objects.push(Vec::new());
+        let mut map = Vec::with_capacity(width*height);
+        for _ in 0..width*height {
+            map.push(Vec::new());
         }
 
         Self {
             distance,
-            topleft: smalltopleft,
-            width: xsize,
+            topleft,
+            width,
             check_radius,
-            objects
+            map
         }
     }
 
-    fn get_smallpos(&self, pos: (i32, i32)) -> (i32, i32) {
-        (pos.0.div_euclid(self.distance), pos.1.div_euclid(self.distance))
-    }
+    
 
     fn smallpos_to_index(&self, smallpos: (i32, i32)) -> usize {
         let xpos = (smallpos.0 - self.topleft.0) as usize;
@@ -169,42 +200,39 @@ impl<T: Positioned + Positionable> SpatialFieldChecker<T> {
     }
 
     fn pos_to_index(&self, pos: (i32, i32)) -> usize {
-        let smallpos = self.get_smallpos(pos);
+        let smallpos = get_smallpos(self.distance, pos);
         self.smallpos_to_index(smallpos)
     }
 
-    pub fn insert(&mut self, o: T) {
-        let pos = o.get_pos();
+    pub fn insert(&mut self, id: i32, pos: (i32, i32)) {
         let i = self.pos_to_index(pos);
-        if let Some(ovec) = self.objects.get_mut(i) {
-            ovec.push(o);
+        if let Some(idvec) = self.map.get_mut(i) {
+            idvec.push(id);
         }
     }
 
-    pub fn for_each_adjacent<F: FnMut(&T) -> ()>(&self, pos: (i32, i32), mut closure: F) {
-        let smallpos = self.get_smallpos(pos);
+    pub fn for_each_adjacent<F: FnMut(i32) -> ()>(&self, pos: (i32, i32), mut closure: F) {
+        let smallpos = get_smallpos(self.distance, pos);
 
         for xdelta in -self.check_radius..=self.check_radius {
             for ydelta in -self.check_radius..=self.check_radius {
                 let checkpos = (smallpos.0 + xdelta, smallpos.1 + ydelta);
                 let i = self.smallpos_to_index(checkpos);
-                if let Some(ovec) = self.objects.get(i) {
-                    for entity in ovec.iter() {
-                        closure(entity);
+                if let Some(idvec) = self.map.get(i) {
+                    for id in idvec.iter() {
+                        closure(*id);
                     }
                 }
             }
         }
     }
-}
 
-impl<T: Positioned + Positionable + Identifiable> SpatialFieldChecker<T> {
-    pub fn remove(&mut self, e: T) -> Option<T> {
-        let smallpos = self.get_smallpos(e.get_pos());
+    pub fn remove(&mut self, id: i32, pos: (i32, i32)) -> Option<i32> {
+        let smallpos = get_smallpos(self.distance, pos);
         let i = self.smallpos_to_index(smallpos);
-        if let Some(objects) = self.objects.get_mut(i) {
-            if let Some(found_i) = objects.iter().position(|o| {
-                o.get_id() != e.get_id()
+        if let Some(objects) = self.map.get_mut(i) {
+            if let Some(found_i) = objects.iter().position(|_id| {
+                *_id != id
             }) {
                 return Some(objects.remove(found_i));
             }
@@ -212,32 +240,25 @@ impl<T: Positioned + Positionable + Identifiable> SpatialFieldChecker<T> {
         return None;
     }
 
-    // pub fn update_pos(&mut self, e: T, newpos: (i32, i32)) -> bool {
-    //     let smallpos = self.get_smallpos(e.get_pos());
-    //     let i = self.smallpos_to_index(smallpos);
+    pub fn update_pos(&mut self, id: i32, oldpos: (i32, i32), newpos: (i32, i32)) {
+        let oldsmallpos = get_smallpos(self.distance, oldpos);
+        let newsmallpos = get_smallpos(self.distance, newpos);
 
-    //     if let Some(objects) = self.objects.get_mut(i) {
-    //         if let Some(object) = objects.iter_mut().find(|o| o.get_id() == e.get_id()) {
-    //             object.set_pos(newpos.0, newpos.1);
-    //             let newsmallpos = self.get_smallpos(newpos);
+        if oldsmallpos == newsmallpos {return}
 
-    //             if newsmallpos != smallpos {
-    //                 let old_i = self.smallpos_to_index(smallpos);
-    //                 if let Some(bucket) = self.objects.get_mut(old_i) {
-    //                     if let Some(found_i) = bucket.iter().position(|o| {o.get_id() != e.get_id()}) {
-    //                         let o = objects.remove(found_i);
-    //                         let new_i = self.smallpos_to_index(newsmallpos);
-    //                         self.objects.get_mut(new_i).map(|| {
+        let oldi = self.smallpos_to_index(oldsmallpos);
+        let newi = self.smallpos_to_index(newsmallpos);
 
-    //                         });
-    //                     }
-    //                 }
-    //                 // moved_buckets = true;
-    //                 if let Some(o) = self.remove(e) {
-    //                     self.insert(o);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
+        // godot_print!("Id {id} moved from {oldpos:?} to {newpos:?}, crossing grid boundary");
+
+        if let Some(ids) = self.map.get_mut(oldi) {
+            if let Some(index) = ids.iter().position(|_id| *_id == id) {
+                ids.remove(index);
+            }
+        }
+
+        if let Some(ids) = self.map.get_mut(newi) {
+            ids.push(id);
+        }
+    }
 }

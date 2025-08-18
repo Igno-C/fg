@@ -13,7 +13,7 @@ pub enum Skill {
 }
 const NUM_SKILLS: usize = 5;
 
-#[derive(Clone, Default, Encode, Decode)]
+#[derive(Clone, Default, Encode, Decode, Debug)]
 pub struct Skills {
     skills: [u8; NUM_SKILLS]
 }

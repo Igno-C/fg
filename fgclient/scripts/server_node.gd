@@ -7,10 +7,10 @@ const FAKEJITTER: float = 30.
 var network: ENetMultiplayerPeer
 var token := ""
 
-signal player_update(x: int, y: int, speed: int, net_id: int)
+signal player_update(x: int, y: int, speed: int, pid: int)
 #signal entity_update(x: int, y: int, speed: int)
 signal generic_update()
-signal data_update(data: PlayerContainer, net_id: int)
+signal data_update(data: PlayerContainer, pid: int)
 
 #signal net_id_update(net_id: int)
 
@@ -104,10 +104,11 @@ func send_data_request(pid: int) -> void:
 func pevent() -> void:
 	pass
 
-func pmove(x: int, y: int, speed: int, net_id: int) -> void:
-	player_update.emit(x, y, speed, net_id)
+func pmove(x: int, y: int, speed: int, pid: int) -> void:
+	player_update.emit(x, y, speed, pid)
 
-func pdata(data: PackedByteArray, net_id: int) -> void:
+func pdata(data: PackedByteArray) -> void:
 	var container := PlayerContainer.from_bytearray(data)
+	var pid: int = container.get_pid()
 	
-	data_update.emit(container, net_id)
+	data_update.emit(container, pid)

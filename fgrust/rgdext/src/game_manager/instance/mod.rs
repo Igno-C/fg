@@ -2,11 +2,12 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use godot::{prelude::*, classes::ResourceLoader};
 use crate::eventqueue::{EQueue, ServerEvent, GameEvent};
-use rgdext_shared::{basemap::{BaseMap, CollisionArray}, playerdata::PlayerData};
+use rgdext_shared::{basemap::{spatialhash::SpatialHash, BaseMap, CollisionArray}, genericevent::GenericServerResponse, playerdata::PlayerData};
 use player::Player; use entity::{Entities, GenericScriptedEntity, ResponseType, ScriptResponse};
 
 pub mod player;
 mod entity;
+// mod spatialhash;
 
 #[derive(GodotClass)]
 #[class(no_init, base=Node)]
@@ -19,6 +20,7 @@ pub struct Instance {
     
     map: Option<Gd<BaseMap>>,
     col_array: CollisionArray,
+    spatial_hash: SpatialHash,
 
     /// net_id -> Player
     players: HashMap<i32, Player>,
@@ -90,24 +92,25 @@ impl INode for Instance {
         let col_array = &self.col_array;
 
         // Ticking players, starting with movement
-        for p in self.players.values_mut() {
+        for (net_id, p) in self.players.iter_mut() {
             // let mut p = p.borrow_mut();
             p.ticks_since_move += 1;
 
             if let Some((nextx, nexty, nextspeed)) = *p.peek_next_move() {
                 // godot_print!("Trying move to {}, {} with speed {}", nextx, nexty, nextspeed);
                 if p.ticks_since_move >= nextspeed {
-                    let (x, y, _speed) = p.get_pos();
+                    let (x, y, _speed) = p.get_full_pos();
 
                     if (x - nextx).abs() == 1 || (y - nexty).abs() == 1 {
                         if !col_array.get_at(nextx, nexty) {
-                            p.set_pos(nextx, nexty, nextspeed);
+                            p.set_full_pos(nextx, nexty, nextspeed);
+                            self.spatial_hash.update_pos(*net_id, (x, y), (nextx, nexty));
 
                             // 0 ticks since last move indicates a move just happened
                             p.ticks_since_move = 0;
                         }
                         else {
-                            godot_print!("Move into wall by {}: {}, {}, {}", &p.data.borrow().name, nextx, nexty, nextspeed);
+                            godot_print!("Move into wall attempt by {}: {}, {}, {}", &p.data.borrow().name, nextx, nexty, nextspeed);
                         }
                     }
 
@@ -120,11 +123,11 @@ impl INode for Instance {
         }
 
 
-        for (net_id, p) in self.players.iter() {
+        for (net_id, p) in self.players.iter_mut() {
             // let mut p = p.borrow_mut();
             // Pushing server events for updated player data
             // Players who just spawned are also just updated
-            if p.data_just_updated {
+            // if p.data_just_updated {
                 // Updating player of their own data
                 // Check here to not send update to player that just disconnected / despawned
                 // if !p.data.is_null() {
@@ -148,37 +151,43 @@ impl INode for Instance {
                 // for target_net_id in self.get_adjacent_players(*net_id) {
                 //     self.equeue.push_server(ServerEvent::UpdatePlayer(packed_mindata.clone(), *net_id, *target_net_id));
                 // }
+            // }
+
+            // Broadcasting movement responses from just moved or spawned player to adjacent players
+            if p.ticks_since_move == 0 || p.just_spawned {
+                let (x, y, speed) = p.get_full_pos();
+                
+                self.spatial_hash.for_each_adjacent((x, y), |adjacent| {
+                    self.equeue.push_server(ServerEvent::PlayerMoveResponse{x, y , speed, pid: p.pid(), net_id: adjacent.0});
+                });
+                // for target_net_id in self.get_adjacent_players(*net_id) {
+                //     self.equeue.push_server(ServerEvent::PlayerMoveResponse{x, y, speed, pid: p.pid(), target_net_id: *target_net_id});
+                // }
             }
 
-            // Pushing server events for every player movement (or initial position after spawning)
-            if p.ticks_since_move == 0 {
-                let (x, y, speed) = p.get_pos();
-                self.equeue.push_server(ServerEvent::PlayerMoveResponse{x, y , speed, pid: p.pid(), target_net_id: *net_id});
-                for target_net_id in self.get_adjacent_players(*net_id) {
-                    self.equeue.push_server(ServerEvent::PlayerMoveResponse{x, y, speed, pid: p.pid(), target_net_id: *target_net_id});
-                }
+            // Broadcasting positions from adjacent players to just spawned player
+            // Getting pdata will be done by the client
+            if p.just_spawned {
+                self.spatial_hash.for_each_adjacent(p.get_pos(), |adjacent| {
+                    let b = adjacent.1.borrow();
+
+                    self.equeue.push_server(ServerEvent::PlayerMoveResponse{x: b.x, y: b.y, speed: 0, pid: b.pid, net_id: *net_id});
+                });
+
+                p.just_spawned = false;
             }
 
             // p.data_just_updated = false;
-            // p.just_spawned = false;
         }
 
-        // for p in self.players.values_mut() {
-        //     p.just_spawned = false;
-        // }
+        for despawn in std::mem::take(&mut self.deferred_despawns) {
+            let (x, y, pid) = despawn;
+            let bytearray = PlayerData::null(pid).to_bytearray();
 
-        // Player data is nulled when they're despawned
-        // This cleans up the list after sending the null packets
-        self.players.retain(|_, p| !p.data.borrow().is_null());
-
-        // Resetting any flags
-        // for p in self.players.values_mut() {
-        //     let mut p = p.borrow_mut();
-        //     p.data_just_updated = false;
-        //     p.just_spawned = false;
-        //     // Reset next move if just moved
-        //     if p.ticks_since_move == 0 {p.nextmove = None;}
-        // }
+            self.spatial_hash.for_each_adjacent((x, y), |adjacent| {
+                self.equeue.push_server(ServerEvent::PlayerDataResponse{data: bytearray.clone(), net_id: adjacent.0});
+            });
+        }
     }
 }
 
@@ -191,6 +200,7 @@ impl Instance {
                 equeue,
                 map: None,
                 col_array: CollisionArray::new(),
+                spatial_hash: SpatialHash::default(),
                 players: HashMap::new(),
                 playercount: 0,
                 deferred_despawns: Vec::new(),
@@ -213,8 +223,9 @@ impl Instance {
 
         mapnode.bind_mut().on_server();
         mapnode.set_name(&self.mapname);
-        let col_array = mapnode.bind_mut().extract_collisions();
+        let (col_array, spatial_hash) = mapnode.bind_mut().extract_collisions();
         self.col_array = col_array;
+        self.spatial_hash = spatial_hash;
         self.base_mut().add_child(&mapnode);
 
         self.map = Some(mapnode);
@@ -222,37 +233,26 @@ impl Instance {
 
     pub fn spawn_player(&mut self, data: Rc<RefCell<PlayerData>>, net_id: i32) {
         data.borrow_mut().location = self.mapname.clone();
-        // let pnode = Player::new(data, x, y);
-        // let player = Rc::new(RefCell::new(pnode));
-        let player = Player::new(data);
-        // let mut p = player.borrow_mut();
-        // p.just_spawned = true;
-        // p.data_just_updated = true;
-        // p.data.x = x; p.data.y = y; p.nextmove = None;
-        // p.set_location(&self.mapname);
-        // drop(p);
 
+        let player = Player::new(data.clone());
+
+        self.spatial_hash.insert(net_id, data, player.get_pos());
         self.players.insert(net_id, player);
         self.playercount += 1;
+
+        self.equeue.push_server(
+            ServerEvent::GenericResponse{response: GenericServerResponse::LoadMap{mapname: self.mapname.clone()}, net_id}
+        );
     }
 
     // Complete removal happens in process()
     // A nulled player first updates other clients, then gets deleted
     pub fn despawn_player(&mut self, net_id: i32) -> Rc<RefCell<PlayerData>> {
         let player = self.players.remove(&net_id).unwrap();
-        self.deferred_despawns.push((player.x(), player.y(), net_id));
+        self.spatial_hash.remove(net_id, player.get_pos());
+        self.deferred_despawns.push((player.x(), player.y(), player.pid()));
+        self.playercount -= 1;
         player.data
-        // if self.players.contains_key(&net_id) {
-        //     self.deferred_despawns.push(net_id);
-        //     // let mut p = p.borrow_mut();
-        //     // // let data = p.data.clone();
-        //     // p.data_just_updated = true;
-        //     // p.data = PlayerData::null();
-        //     // self.playercount -= 1;
-        // }
-        // else {
-        //     godot_error!("Tried to despawn nonexsitent player with net_id {}", net_id);
-        // }
     }
 
     pub fn player_move(&mut self, x: i32, y: i32, speed: i32, net_id: i32) {

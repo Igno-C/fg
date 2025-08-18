@@ -25,12 +25,12 @@ func _ready() -> void:
 	start_server()
 
 func authenticate(net_id: int, username: String, password: String):
-	var err = rpc_id(1, "_authenticate", net_id, username, password)
+	var err = rpc_id(1, "_authenticate", net_id, username.to_lower(), password)
 	if err != OK:
 		printerr("Error on rpc for ", net_id, " in auth client: ", err)
 
 func create_account(net_id: int, username: String, password: String) -> void:
-	var err = rpc_id(1, "_create_account", net_id, username, password)
+	var err = rpc_id(1, "_create_account", net_id, username.to_lower(), password)
 	if err != OK:
 		printerr("Error on rpc for ", net_id, " in auth client: ", err)
 
