@@ -62,3 +62,19 @@ vertical_scroll_mode = 2
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
+
+[node name="RefreshButton" type="Button" parent="ServerList"]
+clip_contents = true
+custom_minimum_size = Vector2(30, 30)
+layout_mode = 2
+offset_left = 374.0
+offset_top = 10.0
+offset_right = 410.0
+offset_bottom = 46.0
+size_flags_horizontal = 4
+size_flags_vertical = 4
+theme_override_font_sizes/font_size = 20
+text = "↻"
+clip_text = true
+
+[connection signal="pressed" from="ServerList/RefreshButton" to="." method="_on_refresh_pressed"]

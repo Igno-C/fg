@@ -1,6 +1,6 @@
 [gd_scene load_steps=4 format=4 uid="uid://yfixoeoigsqs"]
 
-[ext_resource type="Script" uid="uid://b3ulfsqahp2ls" path="res://maps/generic_portal.gd" id="1_1kple"]
+[ext_resource type="Script" uid="uid://b3ulfsqahp2ls" path="res://entities/generic_instance_portal.gd" id="1_1kple"]
 [ext_resource type="TileSet" uid="uid://db4u7skputgfv" path="res://graphics/tilesets/baseset.tres" id="1_12b5l"]
 [ext_resource type="TileSet" uid="uid://d4dk6qwdut6ax" path="res://graphics/tilesets/collisionset.tres" id="2_gh3qo"]
 
@@ -8,12 +8,13 @@
 
 [node name="Entities" type="Node" parent="."]
 
-[node name="GenericScriptedEntity" type="GenericScriptedEntity" parent="Entities"]
-pos = Vector2i(4, -3)
-interactable = true
+[node name="map2portal" type="GenericScriptedEntity" parent="Entities"]
+pos = Vector2i(3, -3)
+walkable = true
 script = ExtResource("1_1kple")
 mapname = "map2"
-to_where = Vector2i(0, -1)
+to_where = Vector2i(7, 0)
+metadata/_custom_type_script = "uid://b3ulfsqahp2ls"
 
 [node name="TileMap" type="TileMapLayer" parent="."]
 use_parent_material = true

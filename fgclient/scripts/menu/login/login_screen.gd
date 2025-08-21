@@ -25,6 +25,7 @@ func _ready() -> void:
 	gateway.creation_status.connect(_on_creation_status)
 	
 	server_list.pressed.connect(_on_server_selected)
+	server_list.refresh_request.connect(_on_server_list_refresh)
 	gateway.got_server_list.connect(_on_got_server_list)
 	gateway.joined_server.connect(_on_joined_server)
 	
@@ -133,3 +134,6 @@ func _on_got_server_list(list: Array[Dictionary]) -> void:
 
 func _on_server_selected(name: String) -> void:
 	gateway.send_chosen_server(name)
+
+func _on_server_list_refresh() -> void:
+	gateway.send_server_list_request()

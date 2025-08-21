@@ -25,6 +25,9 @@ signal send_event(event: GenericEvent)
 signal set_debug_label(text: String)
 
 func _process(_delta:) -> void:
+	if not go_to_target:
+		target = player.pos
+	
 	if Input.is_action_pressed("Up"): target.y = player.pos.y - 1
 	elif Input.is_action_pressed("Down"): target.y = player.pos.y + 1
 	elif Input.is_action_just_released("Up"): target.y = player.pos.y

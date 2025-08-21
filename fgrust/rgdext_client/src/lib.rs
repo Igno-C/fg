@@ -1,5 +1,5 @@
 use godot::prelude::*;
-pub use rgdext_shared::{playerdata::*, basemap::*, genericevent::GenericEvent};
+pub use rgdext_shared::{playerdata::playercontainer::PlayerContainer, basemap::BaseMap, genericevent::GenericEvent};
 
 // pub mod server;
 

@@ -1,25 +1,42 @@
-use std::{cell::RefCell, rc::Rc};
+use godot::{builtin::Rect2i, global::godot_print};
 
-use godot::{builtin::Rect2i};
-
-use crate::playerdata::PlayerData;
+// use crate::playerdata::PlayerData;
 
 
 pub const GRID_SIZE: i32 = 8;
 pub const CHECK_RADIUS: i32 = 3;
 
-#[derive(Default)]
-pub struct SpatialHash {
+//(i32, Rc<RefCell<PlayerData>>)
+
+pub struct SpatialHash<I: Eq, T> {
     grid_size: i32,
     topleft: (i32, i32),
     width: usize,
     height: usize,
     check_radius: i32,
 
-    map: Vec<Vec<(i32, Rc<RefCell<PlayerData>>)>>
+    map: Vec<Vec<(I, T)>>
 }
 
-impl SpatialHash {
+impl<I: Eq, T> Default for SpatialHash<I, T> {
+    fn default() -> Self {
+        Self {
+            grid_size: 0,
+            topleft: (0, 0),
+            width: 0,
+            height: 0,
+            check_radius: 0,
+            map: Vec::new()
+        }
+    }
+}
+
+pub enum MoveDelta<'a, I: Eq, T> {
+    Delta{hash: &'a SpatialHash<I, T>, from: (i32, i32), to: (i32, i32)},
+    NoMove
+}
+
+impl<I: Eq, T> SpatialHash<I, T> {
     pub fn from_used_rect_default(rect: &Rect2i) -> Self {
         let rect_topleft = (rect.position.x, rect.position.y);
         let rect_bottomright = (rect.end().x, rect.end().y);
@@ -74,13 +91,13 @@ impl SpatialHash {
         self.smallpos_to_index(smallpos)
     }
 
-    pub fn insert(&mut self, net_id: i32, pdata: Rc<RefCell<PlayerData>>, pos: (i32, i32)) {
+    pub fn insert(&mut self, id: I, object: T, pos: (i32, i32)) {
         if let Some(i) = self.pos_to_index(pos) {
-            self.map[i].push((net_id, pdata));
+            self.map[i].push((id, object));
         }
     }
 
-    pub fn for_each_adjacent<F: FnMut(&(i32, Rc<RefCell<PlayerData>>)) -> ()>(&self, pos: (i32, i32), mut closure: F) {
+    pub fn for_each_adjacent<F: FnMut(&(I, T)) -> ()>(&self, pos: (i32, i32), mut closure: F) {
         let smallpos = self.get_smallpos(pos);
 
         for xdelta in -self.check_radius..=self.check_radius {
@@ -95,7 +112,7 @@ impl SpatialHash {
         }
     }
 
-    pub fn remove(&mut self, net_id: i32, pos: (i32, i32)) -> Option<(i32, Rc<RefCell<PlayerData>>)> {
+    pub fn remove(&mut self, net_id: I, pos: (i32, i32)) -> Option<(I, T)> {
         let smallpos = self.get_smallpos(pos);
         // let i = ;
         if let Some(i) = self.smallpos_to_index(smallpos) {
@@ -109,11 +126,11 @@ impl SpatialHash {
         return None;
     }
 
-    pub fn update_pos(&mut self, net_id: i32, oldpos: (i32, i32), newpos: (i32, i32)) {
+    pub fn update_pos<'a>(&'a mut self, net_id: I, oldpos: (i32, i32), newpos: (i32, i32)) -> MoveDelta<'a, I, T> {
         let oldsmallpos = self.get_smallpos(oldpos);
         let newsmallpos = self.get_smallpos(newpos);
 
-        if oldsmallpos == newsmallpos {return}
+        if oldsmallpos == newsmallpos {return MoveDelta::NoMove;}
 
         let oldi_maybe = self.smallpos_to_index(oldsmallpos);
         let newi_maybe = self.smallpos_to_index(newsmallpos);
@@ -123,10 +140,35 @@ impl SpatialHash {
                 let id = self.map[oldi].remove(remove_index);
 
                 self.map[newi].push(id);
+                return MoveDelta::Delta{hash: self, from: oldsmallpos, to: newsmallpos};
+            }
+        }
+        return MoveDelta::NoMove;
+    }
+}
+
+impl<'a, I: Eq, T> MoveDelta<'a, I, T> {
+    pub fn for_each_new<F: FnMut(&(I, T)) -> ()>(self, mut closure: F) {
+        if let MoveDelta::Delta{hash, from, to} = self {
+            let radius = hash.check_radius;
+            for xdelta in -radius..=radius {
+                for ydelta in -radius..=radius {
+                    let checkpos = (to.0 + xdelta, to.1 + ydelta);
+                    let from_distance = from.0.abs_diff(checkpos.0).max(from.1.abs_diff(checkpos.1)) as i32;
+                    if from_distance > radius {
+                        if let Some(index) = hash.smallpos_to_index(checkpos) {
+                            for o in hash.map[index].iter() {
+                                closure(o);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 }
+
+
 
 #[cfg(test)]
 mod tests {
@@ -141,7 +183,7 @@ mod tests {
 
     #[test]
     fn test_new_empty_grid() {
-        let hash = SpatialHash::new(8, (0, 0), (31, 31), 3);
+        let hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (31, 31), 3);
         
         assert_eq!(hash.grid_size, 8);
         assert_eq!(hash.topleft, (0, 0));
@@ -154,7 +196,7 @@ mod tests {
 
     #[test]
     fn test_smallpos_conversion() {
-        let hash = SpatialHash::new(8, (0, 0), (31, 31), 3);
+        let hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (31, 31), 3);
         
         assert_eq!(hash.get_smallpos((0, 0)), (0, 0));
         assert_eq!(hash.get_smallpos((7, 7)), (0, 0));
@@ -168,7 +210,7 @@ mod tests {
 
     #[test]
     fn test_index_conversion() {
-        let hash = SpatialHash::new(8, (0, 0), (31, 31), 3);
+        let hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (31, 31), 3);
         
         assert_eq!(hash.smallpos_to_index((0, 0)), Some(0));
         assert_eq!(hash.smallpos_to_index((3, 0)), Some(3));
@@ -186,7 +228,7 @@ mod tests {
 
     #[test]
     fn test_insert_and_query_single_element() {
-        let mut hash = SpatialHash::new(8, (0, 0), (31, 31), 3);
+        let mut hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (31, 31), 3);
         let player_data = create_player_data();
         
         hash.insert(42, player_data, (10, 10));
@@ -208,7 +250,7 @@ mod tests {
 
     #[test]
     fn test_insert_multiple_elements_same_cell() {
-        let mut hash = SpatialHash::new(8, (0, 0), (31, 31), 3);
+        let mut hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (31, 31), 3);
         let player_data = create_player_data();
         
         hash.insert(1, player_data.clone(), (10, 10));
@@ -222,7 +264,7 @@ mod tests {
 
     #[test]
     fn test_insert_different_cells() {
-        let mut hash = SpatialHash::new(8, (0, 0), (31, 31), 3);
+        let mut hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (31, 31), 3);
         let player_data = create_player_data();
         
         hash.insert(1, player_data.clone(), (10, 10));   // Cell (1,1)
@@ -239,7 +281,7 @@ mod tests {
 
     #[test]
 fn test_remove_existing_element() {
-    let mut hash = SpatialHash::new(8, (0, 0), (31, 31), 3);
+    let mut hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (31, 31), 3);
     let player_data = create_player_data();
     
     hash.insert(42, player_data, (10, 10));
@@ -254,7 +296,7 @@ fn test_remove_existing_element() {
 
 #[test]
 fn test_remove_nonexistent_element() {
-    let mut hash = SpatialHash::new(8, (0, 0), (31, 31), 3);
+    let mut hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (31, 31), 3);
     let player_data = create_player_data();
     
     hash.insert(42, player_data, (10, 10));
@@ -269,7 +311,7 @@ fn test_remove_nonexistent_element() {
 
 #[test]
 fn test_update_position_same_cell() {
-    let mut hash = SpatialHash::new(8, (0, 0), (31, 31), 3);
+    let mut hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (31, 31), 3);
     let player_data = create_player_data();
     
     hash.insert(42, player_data, (10, 10));
@@ -282,7 +324,7 @@ fn test_update_position_same_cell() {
 
     #[test]
     fn test_update_position_different_cells() {
-        let mut hash = SpatialHash::new(8, (0, 0), (31, 31), 3);
+        let mut hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (31, 31), 3);
         let player_data = create_player_data();
         
         hash.insert(42, player_data, (10, 10));   // Cell (1,1)
@@ -298,7 +340,7 @@ fn test_update_position_same_cell() {
 
     #[test]
     fn test_query_adjacent_elements() {
-        let mut hash = SpatialHash::new(8, (0, 0), (31, 31), 3);
+        let mut hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (31, 31), 3);
         let player_data = create_player_data();
         
         // Insert elements in cells that should be adjacent to center cell
@@ -320,7 +362,7 @@ fn test_update_position_same_cell() {
 
     #[test]
     fn test_query_adjacent_no_elements() {
-        let mut hash = SpatialHash::new(8, (0, 0), (31, 31), 1);
+        let mut hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (31, 31), 1);
         let player_data = create_player_data();
         
         // Insert elements in cells that should be adjacent to center cell
@@ -341,7 +383,7 @@ fn test_update_position_same_cell() {
 
     #[test]
     fn test_negative_coordinates() {
-        let mut hash = SpatialHash::new(8, (-16, -16), (15, 15), 3);
+        let mut hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (-16, -16), (15, 15), 3);
         let player_data = create_player_data();
         
         // Test negative coordinates

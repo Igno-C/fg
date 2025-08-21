@@ -2,53 +2,55 @@ use std::{cell::RefCell, rc::Rc};
 
 use rgdext_shared::playerdata::PlayerData;
 
+use super::instance::player::Player;
+
 
 
 const PLAYER_DATA_TIMEOUT: f64 = 60.;
 const PLAYER_SAVE_TIMEOUT: f64 = 60.;
 
-pub struct PlayerDataEntry {
-    pub data: Rc<RefCell<PlayerData>>,
-    age: f64,
-    net_id: Option<i32>,
+pub enum PlayerDataEntry {
+    RawData{data: PlayerData, age: f64},
+    ActivePlayer{player: Rc<RefCell<Player>>, age: f64}
+    // pub data: Rc<RefCell<PlayerData>>,
+    // age: f64,
+    // net_id: Option<i32>,
 }
 
 impl PlayerDataEntry {
-    pub fn new_with_id(data: Rc<RefCell<PlayerData>>, net_id: i32) -> Self {
-        Self {
-            data,
-            age: 0.,
-            net_id: Some(net_id)
-        }
+    pub fn new_active(player: Rc<RefCell<Player>>) -> Self {
+        PlayerDataEntry::ActivePlayer{player, age: 0.}
     }
 
-    pub fn new(data: Rc<RefCell<PlayerData>>) -> Self {
-        Self {
-            data,
-            age: 0.,
-            net_id: None
-        }
+    pub fn new_inactive(data: PlayerData) -> Self {
+        PlayerDataEntry::RawData{data, age: 0.}
     }
 
     /// Returns true on timeout
     pub fn tick(&mut self, delta: f64) -> DataTickResult {
-        self.age += delta;
-        if self.net_id.is_none() {
-            if self.age > PLAYER_DATA_TIMEOUT {
-                return DataTickResult::Timeout;
-            }
-        }
-        else {
-            if self.age > PLAYER_SAVE_TIMEOUT {
-                self.age = 0.;
-                return DataTickResult::Save;
-            }
+        match self {
+            PlayerDataEntry::RawData{data: _, age} => {
+                *age += delta;
+                if *age > PLAYER_DATA_TIMEOUT {
+                    return DataTickResult::Timeout;
+                }
+            },
+            PlayerDataEntry::ActivePlayer{player: _, age} => {
+                *age += delta;
+                if *age > PLAYER_SAVE_TIMEOUT {
+                    *age = 0.;
+                    return DataTickResult::Save;
+                }
+            },
         }
         return DataTickResult::Idle;
     }
 
-    pub fn net_id(&self) -> &Option<i32> {
-        &self.net_id
+    pub fn is_active(&self) -> bool {
+        match self {
+            PlayerDataEntry::ActivePlayer{player: _, age: _} => true,
+            _ => false,
+        }
     }
 }
 

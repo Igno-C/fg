@@ -25,9 +25,9 @@ func spawn_loginscreen(with_err: String = "") -> void:
 	var loginscreen: PackedScene = load("uid://bveij4bkswqeh")
 	var ls := loginscreen.instantiate()
 	ls.login_success.connect(_on_login_success)
+	ui_node.add_child(ls)
 	if not with_err.is_empty():
 		ls.login_box.set_err(with_err)
-	ui_node.add_child(ls)
 
 func _on_login_success(pid: int, ip: String, port: int, token: String) -> void:
 	server.connect_to_server(ip, port, token)

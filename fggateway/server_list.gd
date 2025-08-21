@@ -36,7 +36,7 @@ func join_server(name: String, pid: int) -> ServerDirections:
 		return ServerDirections.new("", -2, "")
 	for net_id in servers:
 		var server = servers[net_id]
-		if server.name == name:
+		if server.name == name and not server.max_load():
 			randomize()
 			var token := str(randi()).sha256_text()
 			rpc_id(net_id, "_update", token, pid)
@@ -52,14 +52,15 @@ func _peer_disconnected(user_id) -> void:
 	servers.erase(user_id)
 
 @rpc("any_peer", "call_remote", "unreliable_ordered", 0)
-func _update(current_players: int, max_players: int = -1, port: int = -1, name: String = ""):
+func _update(current_players: int, max_players: int, port: int, name: String):
 	var net_id := multiplayer.get_remote_sender_id()
 	var server_stats: ServerStats = servers[net_id]
 	server_stats.current_players = current_players
-	if max_players != -1:
+	if server_stats.max_players == 0: # Means this must be the first update for this server
 		var mult_peer = multiplayer.multiplayer_peer as ENetMultiplayerPeer
 		var this_peer := mult_peer.get_peer(net_id)
 		server_stats.address = this_peer.get_remote_address()
 		server_stats.port = port
 		server_stats.name = name
-	#print(get_server_list())
+		server_stats.max_players = max_players
+	print(server_stats)

@@ -5,17 +5,38 @@ use bitcode::{Decode, Encode};
 // #[derive(Decode, Encode)]
 #[repr(usize)]
 pub enum Skill {
-    WoodCutting,
+    Woodcutting,
     Mining,
     Smelting,
     Crafting,
     Farming,
+    Strength,
+    Agility,
+    Endurance,
+    Magic
 }
-const NUM_SKILLS: usize = 5;
+const NUM_SKILLS: usize = 9;
+
+impl Skill {
+    pub fn try_from_str(s: &str) -> Option<Skill> {
+        match s {
+            "woodcutting" => Some(Skill::Woodcutting),
+            "mining" => Some(Skill::Mining),
+            "smelting" => Some(Skill::Smelting),
+            "crafting" => Some(Skill::Crafting),
+            "farming" => Some(Skill::Farming),
+            "strength" => Some(Skill::Strength),
+            "agility" => Some(Skill::Agility),
+            "endurance" => Some(Skill::Endurance),
+            "magic" => Some(Skill::Magic),
+            _ => None,
+        }
+    }
+}
 
 #[derive(Clone, Default, Encode, Decode, Debug)]
 pub struct Skills {
-    skills: [u8; NUM_SKILLS]
+    skills: [u8; NUM_SKILLS],
 }
 
 impl std::ops::Index<Skill> for Skills {
@@ -29,5 +50,24 @@ impl std::ops::Index<Skill> for Skills {
 impl std::ops::IndexMut<Skill> for Skills {
     fn index_mut(&mut self, index: Skill) -> &mut u8 {
         &mut self.skills[index as usize]
+    }
+}
+
+#[derive(Clone, Default, Encode, Decode, Debug)]
+pub struct SkillProgress {
+    skill_progress: [i32; NUM_SKILLS],
+}
+
+impl std::ops::Index<Skill> for SkillProgress {
+    type Output = i32;
+
+    fn index(&self, index: Skill) -> &i32 {
+        &self.skill_progress[index as usize]
+    }
+}
+
+impl std::ops::IndexMut<Skill> for SkillProgress {
+    fn index_mut(&mut self, index: Skill) -> &mut i32 {
+        &mut self.skill_progress[index as usize]
     }
 }

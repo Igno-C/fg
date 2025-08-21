@@ -6,6 +6,7 @@ extends GenericEntity
 @onready var name_label: Label = get_node("NameLabel")
 
 var data: PlayerContainer
+var data_version: int = -1
 
 func receive_data(newdata: PlayerContainer) -> void:
 	data = newdata

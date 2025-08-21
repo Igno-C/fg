@@ -1,109 +1,24 @@
 use bitcode::{Decode, Encode};
-// use serde::{Serialize, Deserialize};
 use godot::prelude::*;
 
 pub mod item;
 pub mod skills;
+pub mod playercontainer;
 
-#[derive(GodotClass)]
-#[class(no_init, base=RefCounted)]
-pub struct PlayerContainer {
-    data: PlayerData,
-    
-    base: Base<RefCounted>
-}
-
-#[godot_api]
-impl PlayerContainer {
-    #[func]
-    fn from_bytearray(b: PackedByteArray) -> Gd<PlayerContainer> {
-        Gd::from_init_fn(|base| {
-            PlayerContainer {
-                data: 
-                    match PlayerData::from_bytes(b.as_slice()) {
-                        Ok(d) => d,
-                        Err(message) => {
-                            godot_error!("{}", message.to_string());
-                            PlayerData::default()
-                        }
-                    },
-                base
-            }
-        })
-    }
-
-    #[func]
-    fn from_name(name: String, pid: i32) -> Gd<PlayerContainer> {
-        let mut data = PlayerData::default();
-        data.name = name;
-        data.pid = pid;
-        Gd::from_init_fn(|base| {
-            PlayerContainer {
-                data,
-                base
-            }
-        })
-    }
-
-    #[func]
-    fn null(pid: i32) -> Gd<PlayerContainer> {
-        Gd::from_init_fn(|base| {
-            PlayerContainer {
-                data: PlayerData::null(pid),
-                base
-            }
-        })
-    }
-
-    #[func]
-    pub fn to_bytearray(&self) -> PackedByteArray {
-        self.data.to_bytearray()
-    }
-
-    #[func]
-    /// Allocates a new Godot String, try to call only once if needed
-    fn get_name(&self) -> GString {
-        self.data.name.clone().into()
-    }
-
-    #[func]
-    fn get_pid(&self) -> i32 {
-        self.data.pid
-    }
-
-    #[func]
-    /// Allocates a new Godot String, try to call only once if needed
-    fn get_location(&self) -> GString {
-        self.data.location.clone().into()
-    }
-
-    #[func]
-    fn get_pos(&self) -> Vector2i {
-        Vector2i{x: self.data.x, y: self.data.y}
-    }
-
-    #[func]
-    fn set_pos(&mut self, pos: Vector2i) {
-        self.data.x = pos.x;
-        self.data.y = pos.y;
-    }
-
-    #[func]
-    fn is_null(&self) -> bool {
-        self.data.is_null()
-    }
-}
 
 #[derive(Clone, Encode, Decode, Debug)]
 pub struct PlayerData {
     pub name: String,
     pub pid: i32,
+
+    pub server_name: String,
     pub location: String,
     pub x: i32,
     pub y: i32,
 
-    skills: skills::Skills,
-    items: Vec<item::Item>,
+    pub skills: skills::Skills,
+    pub skill_progress: skills::SkillProgress,
+    pub items: Vec<item::Item>,
 }
 
 impl PlayerData {
@@ -125,11 +40,15 @@ impl PlayerData {
         Self {
             name: "".to_string(),
             pid,
+
+            server_name: "".to_string(),
             location: "".to_string(),
+
             x: 0,
             y: 0,
 
             skills: skills::Skills::default(),
+            skill_progress: skills::SkillProgress::default(),
             items: Vec::new(),
         }
     }
@@ -143,12 +62,15 @@ impl PlayerData {
         Self {
             name: self.name.clone(),
             pid: self.pid,
+
+            server_name: self.server_name.clone(),
             location: self.location.clone(),
 
             x: self.x,
             y: self.y,
 
             skills: self.skills.clone(),
+            skill_progress: skills::SkillProgress::default(),
             items: Vec::new(),
         }
     }
@@ -161,12 +83,15 @@ impl Default for PlayerData {
         Self {
             name: Default::default(),
             pid: -1,
+
+            server_name: "".to_string(),
             location: "map1".to_string(),
 
             x: 0,
             y: 0,
 
             skills: skills::Skills::default(),
+            skill_progress: skills::SkillProgress::default(),
             items: Vec::new(),
         }
     }

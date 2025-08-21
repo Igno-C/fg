@@ -17,17 +17,20 @@ signal set_debug_label(text: String)
 func _ready() -> void:
 	server.player_update.connect(_on_player_update)
 	server.data_update.connect(_on_data_update)
-	server.generic_update.connect(_on_generic_update)
+	server.generic_response.connect(_on_generic_response)
 
-func _on_player_update(x: int, y: int, speed: int, pid: int) -> void:
-	#print("Player ", player_net_id, " got response: ", x, ", ", y, ", ", speed, " for net_id ", net_id)
-	print("pid %s got update: %s, %s, %s" % [pid, x, y, speed])
+func _on_player_update(x: int, y: int, speed: int, data_version: int, pid: int) -> void:
+	print("pid %s got update: %s, %s, %s, dataver %s" % [pid, x, y, speed, data_version])
 	var p: PlayerEntity
 	# Gets player or spawns if new
 	if not players.has(pid):
 		p = spawn_player(pid)
 	else:
 		p = players[pid]
+	
+	if p.data_version < data_version:
+		server.send_data_request(pid)
+		p.data_version = data_version
 	
 	# Forwards the move info to the given player
 	# or to the controller if it's the user player
@@ -47,34 +50,32 @@ func _on_data_update(data: PlayerContainer, pid: int) -> void:
 		spawn_player(pid)
 	p = players[pid]
 	p.receive_data(data)
-	if pid == player_pid:
-		load_map(data.get_location())
 
-func _on_generic_update(response: GenericResponse) -> void:
-	pass
+func _on_generic_response(response: GenericResponse) -> void:
+	match response.response_type():
+		GenericResponse.RESPONSE_ERR:
+			print("Got err generic response!")
+		GenericResponse.RESPONSE_LOAD_MAP:
+			load_map(response.as_load_map())
 
 func load_map(mapname: String):
-	# There is a map loaded and there is no need to change it
-	if map != null and map.name == mapname:
-		return
-	
 	if map != null: map.queue_free()
 	
 	print("Loading map: ", mapname)
-	for net_id: int in players:
-		var p: PlayerEntity = players[net_id]
-		if p.data.get_location() != mapname:
+	for pid: int in players:
+		if pid != player_pid:
+			var p: PlayerEntity = players[pid]
 			p.queue_free()
-			players.erase(net_id)
+			players.erase(pid)
 	
-	var mapscene: PackedScene = load("res://maps/" + mapname + ".tscn")
+	var mapscene: PackedScene = load("res://maps/%s.tscn" % mapname)
 	map = mapscene.instantiate()
 	map.name = mapname
 	game_node.add_child(map)
-	#spawn_player_controller()
 	player_controller.map = map
+	player_controller.player.data.set_location(mapname)
 
-func spawn_player(pid: int, data: PlayerContainer = null):
+func spawn_player(pid: int, data: PlayerContainer = null) -> PlayerEntity:
 	print("Spawning new player entity for pid %s" % pid)
 	var playerscene: PackedScene = load("res://scenes/player/GenericPlayer.tscn")
 	var p: PlayerEntity = playerscene.instantiate()
@@ -89,10 +90,12 @@ func spawn_player(pid: int, data: PlayerContainer = null):
 	players[pid] = p
 	game_node.add_child(p)
 	
-	if data != null:
-		p.receive_data(data)
-	else:
-		server.send_data_request(pid)
+	#if data != null:
+		#p.receive_data(data)
+	#else:
+		#server.send_data_request(pid)
+	
+	return p
 
 func despawn_player(net_id: int) -> void:
 	players[net_id].queue_free()

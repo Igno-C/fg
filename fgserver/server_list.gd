@@ -4,10 +4,8 @@ extends ServerConnector
 const everythismany: int = 60
 var tick: int = 0
 var server_name: String
-var first_update: bool = true
 
 @onready var server_node: Server = get_node("/root/ServerNode")
-@onready var manager_node: GameManager = get_node("/root/ManagerNode")
 
 func _ready() -> void:
 	var config := ConfigFile.new()
@@ -16,6 +14,9 @@ func _ready() -> void:
 	var port: int = config.get_value("ServerList", "port")
 	var auth_token: String = config.get_value("ServerList", "auth_token")
 	server_name = config.get_value("ServerList", "server_name", "unset server name")
+	
+	var game_manager: GameManager = get_node("/root/ManagerNode")
+	game_manager.set_server_name(server_name)
 	
 	set_name("serverlist")
 	set_target_name("gateway")
@@ -35,17 +36,11 @@ func _process(_delta: float) -> void:
 
 func update_gateway() -> void:
 	var current_players = server_node.current_players()
-	if first_update:
-		first_update = false
-		
-		var max_players = server_node.max_players()
-		var realport = server_node.port()
-		rpc_id(1, "_update", current_players, max_players, realport, server_name)
-	else:
-		rpc_id(1, "_update", current_players)
+	var max_players = server_node.max_players()
+	var realport = server_node.port()
+	rpc_id(1, "_update", current_players, max_players, realport, server_name)
 
 func _on_peer_connected(_net_id: int) -> void:
-	first_update = true
 	tick = everythismany-1
 
 @rpc("any_peer", "call_remote", "reliable", 0)

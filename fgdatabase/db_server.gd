@@ -60,12 +60,15 @@ func create_new_player(pid: int, username: String) -> void:
 		"data": PlayerContainer.from_name(username, pid).to_bytearray()
 	})
 
+# Sets all lock_ids equal net_id to null 
 func unlock_all(net_id: int) -> void:
 	db.query_with_bindings(unlock_all_query, [net_id])
 
+# Sets lock_id to null for pid
 func unlock_pid(pid: int) -> void:
 	db.query_with_bindings(lock_query, [null, pid])
 
+# Sets lock_id to net_id for pid
 func lock_pid(pid: int, net_id: int) -> void:
 	db.query_with_bindings(lock_query, [net_id, pid])
 

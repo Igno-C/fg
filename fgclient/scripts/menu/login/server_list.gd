@@ -5,6 +5,7 @@ var entry_scene: PackedScene = preload("res://scenes/menu/login/ServerListEntry.
 
 
 signal pressed(server_name: String)
+signal refresh_request
 
 
 func set_enabled(enabled: bool) -> void:
@@ -32,7 +33,8 @@ func populate(servers: Array[Dictionary]) -> void:
 		
 		vbox.add_child(entry)
 
-
+func _on_refresh_pressed() -> void:
+	refresh_request.emit()
 
 func _on_entry_pressed(server_name: String) -> void:
 	set_enabled(false)

@@ -71,7 +71,7 @@ impl EQueue {
 }
 
 pub enum ServerEvent {
-    PlayerMoveResponse{x: i32, y: i32, speed: i32, pid: i32, net_id: i32},
+    PlayerMoveResponse{x: i32, y: i32, speed: i32, pid: i32, data_version: i32, net_id: i32},
     PlayerDataResponse{data: PackedByteArray, net_id: i32},
     PlayerForceDisconnect{net_id: i32},
 
@@ -84,6 +84,7 @@ pub enum GameEvent {
     PlayerDisconnected{net_id: i32},
     /// Joins player to an instance by the given map name
     PlayerJoinInstance{mapname: String, x: i32, y: i32, net_id: i32},
+    PlayerChat{text: GString, target_pid: i32, net_id: i32},
     GenericEvent{event: GenericPlayerEvent, net_id: i32},
     /// net_id of the user requesting, pid of the user whose data is requested
     PDataRequest{pid: i32, net_id: i32}

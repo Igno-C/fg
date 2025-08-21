@@ -65,7 +65,7 @@ pub struct GenericResponse {
 #[godot_api]
 impl GenericResponse {
     #[func]
-    pub fn from_bytearray(&mut self, b: PackedByteArray) -> Gd<GenericResponse> {
+    pub fn from_bytearray(b: PackedByteArray) -> Gd<GenericResponse> {
         Gd::from_init_fn(|base| {
             GenericResponse {
                 response: GenericServerResponse::from_bytes(b.as_slice()),

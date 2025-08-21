@@ -4,7 +4,7 @@ use godot::prelude::*;
 use rgdext_shared::{genericevent::GenericPlayerEvent, playerdata::PlayerData};
 
 use crate::eventqueue::{EQueue, GameEvent, ServerEvent};
-use instance::{Instance};
+use instance::{player::Player, Instance};
 use misc::*;
 
 mod instance;
@@ -13,14 +13,14 @@ mod misc;
 #[derive(GodotClass)]
 #[class(base=Node)]
 pub struct GameManager {
+    server_name: String,
     equeue: EQueue,
 
     /// net_id -> player's current instance pointer
     // player_instances: HashMap<i32, Gd<instance::Instance>>,
     player_locations: HashMap<i32, Gd<instance::Instance>>,
-    /// pid -> pdata
+    /// pid -> playerdataentry
     player_datas: HashMap<i32, PlayerDataEntry>,
-    // current_players: i32,
 
     /// mapname -> list of instances
     instances: HashMap<String, Vec<Gd<instance::Instance>>>,
@@ -39,6 +39,7 @@ pub struct GameManager {
 impl INode for GameManager {
     fn init(base: Base<Node>) -> Self {
         Self {
+            server_name: String::new(),
             equeue: EQueue::default(),
 
             player_locations: HashMap::new(),
@@ -71,13 +72,16 @@ impl INode for GameManager {
                     saves.push(*pid);
                     true
                 },
-                DataTickResult::Timeout => false,
+                DataTickResult::Timeout => {
+                    godot_print!("Data for pid {} timed out.", pid);
+                    false
+                },
             }
         });
 
         for pid_to_save in saves {
             godot_print!("Saving data for pid {pid_to_save}");
-            self.save_data(pid_to_save, false);
+            self.save_dataentry(pid_to_save);
         }
 
         for e in self.equeue.iter_game() {
@@ -86,7 +90,7 @@ impl INode for GameManager {
                 GameEvent::PlayerJoined{net_id, pid} => self.player_joined(net_id, pid),
                 GameEvent::PlayerDisconnected{net_id} => self.player_despawn(net_id),
                 GameEvent::PlayerJoinInstance{mapname, x, y, net_id} => self.player_join_instance(&mapname, x, y, net_id),
-                // GameEvent::PlayerInteract{x, y, net_id} => self.player_interact(x, y, net_id),
+                GameEvent::PlayerChat{text, target_pid, net_id} => {self.broadcast_chat(text, target_pid, net_id)},
                 GameEvent::GenericEvent{event, net_id} => self.handle_generic_event(event, net_id),
                 GameEvent::PDataRequest{pid, net_id} => self.player_retrieve_data(net_id, pid),
             }
@@ -107,38 +111,60 @@ impl GameManager {
     }
 
     #[func]
+    fn set_server_name(&mut self, name: String) {
+        self.server_name = name;
+    }
+
+    #[func]
     fn _on_save_request(&mut self, pid: i32) {
-        self.save_data(pid, false);
+        self.save_dataentry(pid);
+    }
+
+    #[func]
+    fn full_save(&self) {
+        
     }
 
     #[func]
     fn _on_db_retrieved(&mut self, pid: i32, data: PackedByteArray) {
-        let data = PlayerData::from_bytes(data.as_slice()).unwrap();
+        let data = PlayerData::from_bytes(data.as_slice());
 
         if let Some(dataget) = self.datagets.remove(&pid) {
-            let minimal_data = data.get_minimal().to_bytearray();
+            if let Ok(data) = &data {
+                let minimal_data = data.get_minimal().to_bytearray();
             
-            for net_id in dataget {
-                // Safe to clone PackedByteArray because it's CoW
-                self.equeue.push_server(ServerEvent::PlayerDataResponse{data: minimal_data.clone(), net_id: net_id});
+                for net_id in dataget {
+                    // Safe to clone PackedByteArray because it's CoW
+                    self.equeue.push_server(ServerEvent::PlayerDataResponse{data: minimal_data.clone(), net_id: net_id});
+                }
             }
+            
         }
 
+        // This is where the player truly joins the server and the Player object is created
         let new_entry = if let Some(net_id) = self.full_datagets.remove(&pid) {
-            // This is where the player truly joins the server and the Player object is created
-            self.equeue.push_server(ServerEvent::PlayerDataResponse{data: data.to_bytearray(), net_id: net_id});
+            if let Ok(data) = data {
+                self.equeue.push_server(ServerEvent::PlayerDataResponse{data: data.to_bytearray(), net_id: net_id});
             
-            let pdata = Rc::new(RefCell::new(data));
-            let mut instance = self.get_instance(&pdata.borrow().location);
-            instance.bind_mut().spawn_player(pdata.clone(), net_id);
-            self.player_locations.insert(net_id, instance);
-            PlayerDataEntry::new_with_id(pdata, net_id)
+                // let pdata = Rc::new(RefCell::new(data));
+                let mut instance = self.get_instance(&data.location);
+                let player = Player::new_rc(data, &self.server_name);
+                instance.bind_mut().spawn_player(player.clone(), net_id);
+                self.player_locations.insert(net_id, instance);
+    
+                PlayerDataEntry::new_active(player)
+            }
+            else {
+                self.equeue.push_server(ServerEvent::PlayerForceDisconnect{net_id});
+                panic!("Received invalid data for pid {pid}");
+            }
         }
         else {
             // Otherwise, hold the entry until it times out
-            let pdata = Rc::new(RefCell::new(data));
+            // let pdata = Rc::new(RefCell::new(data));
 
-            PlayerDataEntry::new(pdata)
+            PlayerDataEntry::new_inactive(data.unwrap())
+            // PlayerDataEntry::new(pdata)
         };
 
         // Store the data entry
@@ -150,19 +176,34 @@ impl GameManager {
         };
     }
 
-    fn save_data(&mut self, pid: i32, unlock: bool) {
-        if let Some(pdata) = self.player_datas.get(&pid) {
-            let data = pdata.data.borrow().to_bytearray();
-            self.signals().save().emit(pid, &data, unlock);
+    // Saves data stored in dataentry with pid
+    fn save_dataentry(&mut self, pid: i32) {
+        if let Some(dataentry) = self.player_datas.get(&pid) {
+            if let PlayerDataEntry::ActivePlayer{player, age: _} = dataentry {
+                let data = player.borrow().data().to_bytearray();
+                self.signals().save().emit(pid, &data, false);
+            }
         }
         else {
             godot_error!("Tried to save pid {pid} while it's missing data");
         }
     }
 
+    // Eats the player rc, resets server_name, saves with unlock
+    fn save_unlocking(&mut self, player: Rc<RefCell<Player>>) {
+        let mut b = player.borrow_mut();
+        b.data_mut().server_name.clear();
+        let pid = b.pid();
+        self.signals().save().emit(pid, &b.data().to_bytearray(), true);
+        drop(b); drop(player);
+    }
+
     fn player_retrieve_data(&mut self, net_id: i32, pid: i32) {
-        if let Some(pdata) = self.player_datas.get(&pid) {
-            let data = pdata.data.borrow().get_minimal().to_bytearray();
+        if let Some(pdataentry) = self.player_datas.get(&pid) {
+            let data = match pdataentry {
+                PlayerDataEntry::RawData{data, age: _} => data.to_bytearray(),
+                PlayerDataEntry::ActivePlayer{player, age: _} => player.borrow().data().to_bytearray(),
+            };
             self.equeue.push_server(ServerEvent::PlayerDataResponse{data, net_id: net_id});
         }
         else {
@@ -209,8 +250,9 @@ impl GameManager {
     // Sets up pointer to player's instance, rest is handled by the instance itself
     fn player_joined(&mut self, net_id: i32, pid: i32) {
         // A player with this pid is already on the server
-        if self.player_datas.get(&pid).is_some_and(|e| e.net_id().is_some()) {
+        if self.player_datas.get(&pid).is_some_and(|e| e.is_active()) {
             self.equeue.push_server(ServerEvent::PlayerForceDisconnect{net_id});
+            godot_print!("Double join attempt from pid {pid}");
             return;
         }
 
@@ -219,12 +261,24 @@ impl GameManager {
         self.signals().retrieve().emit(pid, true);
     }
 
+    // Turns the player data into an inactive entry
     fn player_despawn(&mut self, net_id: i32) {
         if let Some(instance) = self.player_locations.get_mut(&net_id) {
-            let data = instance.bind_mut().despawn_player(net_id);
-            self.signals().save().emit(data.borrow().pid, &data.borrow().to_bytearray(), true);
+            let player = instance.bind_mut().despawn_player(net_id);
+            let pid = player.borrow().pid();
+            self.save_unlocking(player);
+            
+            self.player_locations.remove(&net_id);
+            if let Some(pdataentry) = self.player_datas.remove(&pid) {
+                if let PlayerDataEntry::ActivePlayer{player, age: _} = pdataentry {
+                    let data = match std::rc::Rc::try_unwrap(player) {
+                        Ok(p) => p.into_inner().into_data(),
+                        Err(rc) => panic!("Couldn't unwrap player rc for {net_id}! refcount: {}", std::rc::Rc::strong_count(&rc)),
+                    };
+                    self.player_datas.insert(pid, PlayerDataEntry::new_inactive(data));
+                };
+            };
         }
-        self.player_locations.remove(&net_id);
     }
 
     /// Gets the best instance for given map name.
@@ -248,13 +302,12 @@ impl GameManager {
         let mut new_instance = self.get_instance(mapname);
         
         self.player_locations.entry(net_id).and_modify(|old_instance| {
-            let data = old_instance.bind_mut().despawn_player(net_id);
-            let mut b = data.borrow_mut();
-            b.x = x; b.y = y;
+            let player = old_instance.bind_mut().despawn_player(net_id);
+            let mut b = player.borrow_mut();
+            b.set_full_pos(x, y, 0);
             drop(b);
-            new_instance.bind_mut().spawn_player(data, net_id);
+            new_instance.bind_mut().spawn_player(player, net_id);
             *old_instance = new_instance;
-
         });
         // self.player_locations.insert(net_id, instance.clone());
 
@@ -270,5 +323,9 @@ impl GameManager {
             },
             GenericPlayerEvent::Err => {},
         }
+    }
+
+    fn broadcast_chat(&self, text: GString, target_pid: i32, net_id: i32) {
+
     }
 }

@@ -106,8 +106,8 @@ impl INode for Server {
         let iter = self.equeue.iter_server();
         for e in iter {
             match e {
-                ServerEvent::PlayerMoveResponse{x, y, speed, pid, net_id} => {
-                    self.base_mut().rpc_id(net_id.into(), "pmove", vslice![x, y, speed, pid]);
+                ServerEvent::PlayerMoveResponse{x, y, speed, pid, data_version, net_id} => {
+                    self.base_mut().rpc_id(net_id.into(), "pmove", vslice![x, y, speed, data_version, pid]);
                 },
                 ServerEvent::PlayerDataResponse{data, net_id} => {
                     self.base_mut().rpc_id(net_id.into(), "pdata", vslice![data]);
@@ -240,13 +240,21 @@ impl Server {
         );
     }
 
-    // Player interacts with
     #[func]
     fn pevent(&mut self, pevent_bytes: PackedByteArray) {
         let net_id = self.base().get_multiplayer().unwrap().get_remote_sender_id();
         let event = GenericPlayerEvent::from_bytes(pevent_bytes.as_slice());
         self.equeue.push_game(
             GameEvent::GenericEvent{net_id, event}
+        );
+    }
+
+    /// If target_pid is -1, that means zone chat
+    #[func]
+    fn pchat(&mut self, text: GString, target_pid: i32) {
+        let net_id = self.base().get_multiplayer().unwrap().get_remote_sender_id();
+        self.equeue.push_game(
+            GameEvent::PlayerChat{text, target_pid, net_id}
         );
     }
 }

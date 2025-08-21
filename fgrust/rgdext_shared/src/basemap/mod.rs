@@ -1,5 +1,9 @@
+use std::{cell::RefCell, rc::Rc};
+
 use godot::{prelude::*, classes::TileMapLayer};
 use spatialhash::SpatialHash;
+
+use crate::playerdata::PlayerData;
 
 pub mod spatialhash;
 
@@ -63,11 +67,11 @@ impl BaseMap {
 
     /// If the collisions were already extracted, they're set to null here
     fn bake_collisions(&mut self) {
-        self.col_array = self.extract_collisions().0;
+        self.col_array = self.extract_collisions::<()>().0;
     }
 
     /// Also drops the collision tilemap.
-    pub fn extract_collisions(&mut self) -> (CollisionArray, SpatialHash) {
+    pub fn extract_collisions<T>(&mut self) -> (CollisionArray, SpatialHash<i32, T>) {
         // CMap is the expected name of the collision tilemap node
         let mut tmap_c: Gd<TileMapLayer> = match self.base().try_get_node_as::<TileMapLayer>("CMap") {
             Some(map) => map,

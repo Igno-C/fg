@@ -9,22 +9,26 @@ use rgdext_shared::playerdata::PlayerData;
 // #[class(base=Node)]
 pub struct Player {
     pub ticks_since_move: i32,
-    pub speed: i32,
+    speed: i32,
     // These two essentially make a 2-move buffer
-    pub nextmove: Option<(i32, i32, i32)>,
-    pub nextnextmove: Option<(i32, i32, i32)>,
+    nextmove: Option<(i32, i32, i32)>,
+    nextnextmove: Option<(i32, i32, i32)>,
 
-    pub data: Rc<RefCell<PlayerData>>,
+    data: PlayerData,
+    /// Counter that increments every time the non-positional data is edited
+    /// 
+    /// Used by clients to know whether they have the most up to date player data
+    data_version: i32,
     // pub location: String,
-    /// Flag that signals that players should be sent updated player data
-    pub data_just_updated: bool,
+    // Flag that signals that players should be sent updated player data
+    // pub data_just_updated: bool,
 
-    /// Ugly flag just used to update players on their positions once
-    pub just_spawned: bool,
+    // Ugly flag just used to update players on their positions once
+    // pub just_spawned: bool,
 }
 
 impl Player {
-    pub fn set_next_move(&mut self, x: i32, y: i32, speed: i32) {
+    pub fn insert_next_move(&mut self, x: i32, y: i32, speed: i32) {
         if self.nextmove.is_none() {
             self.nextmove = Some((x, y, speed));
         }
@@ -46,58 +50,79 @@ impl Player {
         self.nextmove = self.nextnextmove.take();
     }
 
-    // pub fn get_pos_mut(&mut self) -> (&mut i32, &mut i32, &mut i32) {
-    //     (&mut self.data.x, &mut self.data.y, &mut self.data.speed)
-    // }
-
     pub fn get_full_pos(&self) -> (i32, i32, i32) {
-        let b = self.data.borrow();
+        let b = &self.data;
         (b.x, b.y, self.speed)
     }
 
     pub fn get_pos(&self) -> (i32, i32) {
-        let b = self.data.borrow();
+        let b = &self.data;
         (b.x, b.y)
     }
 
     pub fn set_full_pos(&mut self, x: i32, y: i32, speed: i32) {
-        let mut b = self.data.borrow_mut();
-        b.x = x; b.y = y; self.speed = speed;
+        let b = &mut self.data;
+        b.x = x; b.y = y; self.speed = speed; self.ticks_since_move = 0;
     }
 
-    pub fn x(&self) -> i32 {self.data.borrow().x}
+    pub fn x(&self) -> i32 {self.data.x}
 
-    pub fn y(&self) -> i32 {self.data.borrow().y}
+    pub fn y(&self) -> i32 {self.data.y}
 
     pub fn speed(&self) -> i32 {self.speed}
 
-    pub fn pid(&self) -> i32 {self.data.borrow().pid}
+    pub fn pid(&self) -> i32 {self.data.pid}
 
-    /// Has data_just_updated = true and just_spawned = true
-    pub fn new(data: Rc<RefCell<PlayerData>>) -> Self {
-        // data.borrow_mut().location = location.to_string();
-        // let startx = 0;
-        // let starty = 0;
-        Self {
-            ticks_since_move: 0,
-            speed: 0,
-            nextmove: None,
-            nextnextmove: None,
-            // location: location.to_string(),
+    pub fn data_version(&self) -> i32 {self.data_version}
 
-            data,
-            data_just_updated: true,
+    pub fn data(&self) -> &PlayerData {&self.data}
 
-            just_spawned: true,
-        }
+    /// Increments data_version, so you better change something
+    pub fn data_mut(&mut self) -> &mut PlayerData {
+        self.data_version += 1;
+        &mut self.data
     }
 
-    // pub fn new_rc(data: PlayerData, startx: i32, starty: i32, location: impl ToString) -> Rc<RefCell<Self>> {
-    //     Rc::new(RefCell::new(Player::new(data, startx, starty, location)))
+    pub fn into_data(self) -> PlayerData {
+        self.data
+    }
+
+    pub fn new_rc(mut data: PlayerData, server_name: impl ToString) -> Rc<RefCell<Self>> {
+        data.server_name = server_name.to_string();
+        Rc::new(RefCell::new(
+            Self {
+                ticks_since_move: 0,
+                speed: 0,
+                nextmove: None,
+                nextnextmove: None,
+    
+                data,
+                data_version: 0,
+            }
+        ))
+    }
+
+    /// Has data_just_updated = true and just_spawned = true
+    // pub fn new(data: Rc<RefCell<PlayerData>>) -> Self {
+    //     // data.borrow_mut().location = location.to_string();
+    //     // let startx = 0;
+    //     // let starty = 0;
+    //     Self {
+    //         ticks_since_move: 0,
+    //         speed: 0,
+    //         nextmove: None,
+    //         nextnextmove: None,
+    //         // location: location.to_string(),
+
+    //         data,
+    //         data_version: 0,
+
+    //         // just_spawned: true,
+    //     }
     // }
 
     pub fn set_location(&mut self, location: impl ToString) {
-        self.data.borrow_mut().location = location.to_string();
+        self.data.location = location.to_string();
     }
 }
 
