@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::{BTreeMap, HashMap}, rc::Rc};
+use std::{cell::RefCell, collections::{BTreeMap, HashMap}, rc::Rc, sync::{atomic::{AtomicBool, Ordering}, Arc}};
 
 use godot::prelude::*;
 use rgdext_shared::{genericevent::GenericPlayerEvent, playerdata::PlayerData};
@@ -32,6 +32,9 @@ pub struct GameManager {
     /// pid -> net_id
     full_datagets: BTreeMap<i32, i32>,
 
+    /// Set to true on getting SIGINT
+    got_sigint: Arc<AtomicBool>,
+
     base: Base<Node>
 }
 
@@ -49,11 +52,19 @@ impl INode for GameManager {
             datagets: BTreeMap::new(),
             full_datagets: BTreeMap::new(),
 
+            got_sigint: Arc::new(AtomicBool::new(false)),
+
             base
         }
     }
 
     fn ready(&mut self) {
+        // Setting up handler for SIGINT
+        let got_sigint_clone = self.got_sigint.clone();
+        ctrlc::set_handler(move || {
+            got_sigint_clone.store(true, Ordering::Relaxed);
+        }).unwrap();
+
         let mut db_server: Gd<Node> = self.base().get_node_as("/root/DbServer");
         db_server.connect("retrieved", &Callable::from_object_method(&self.to_gd(), "_on_db_retrieved"));
         db_server.connect("request_save", &Callable::from_object_method(&self.to_gd(), "_on_save_request"));
@@ -64,6 +75,29 @@ impl INode for GameManager {
     }
 
     fn process(&mut self, delta: f64) {
+        // What happens on receiving SIGINT
+        if self.got_sigint.load(Ordering::Relaxed) {
+            if self.player_datas.is_empty() {
+                godot_print!("Quitting now");
+                self.base().get_tree().unwrap().quit();
+                return;
+            }
+
+            godot_print!("Doing full save before quitting");
+            self.full_save();
+            // godot_print!("Waiting 5 seconds");
+
+            // self.base().get_tree().unwrap()
+            //     .create_timer(5.).unwrap()
+            //     .signals().timeout()
+            //     .connect_other(&self.to_gd(),
+            //         |a| {
+            //             godot_print!("Quitting now");
+            //             a.base().get_tree().unwrap().quit();
+            //         }
+            // );
+        }
+
         let mut saves = Vec::with_capacity(10);
         self.player_datas.retain(|pid, pdata| {
             match pdata.tick(delta) {
@@ -80,7 +114,6 @@ impl INode for GameManager {
         });
 
         for pid_to_save in saves {
-            godot_print!("Saving data for pid {pid_to_save}");
             self.save_dataentry(pid_to_save);
         }
 
@@ -120,9 +153,25 @@ impl GameManager {
         self.save_dataentry(pid);
     }
 
-    #[func]
-    fn full_save(&self) {
+    /// Does unlocking saves for all playerdatas, consuming them, then disables process for itself and all instances
+    fn full_save(&mut self) {
+        self.player_locations.clear();
+        for instances in std::mem::take(&mut self.instances).into_values() {
+            for mut instance in instances {
+                instance.queue_free();
+            }
+        }
         
+        for (pid, dataentry) in std::mem::take(&mut self.player_datas).into_iter() {
+            if let PlayerDataEntry::ActivePlayer{player, net_id, age: _} = dataentry {
+                let bytearray = player.borrow().data().to_bytearray();
+
+                self.signals().save().emit(pid, &bytearray, true);
+                self.equeue.push_server(ServerEvent::PlayerForceDisconnect{net_id});
+            }
+        }
+
+        self.base_mut().set_process(false);
     }
 
     #[func]
@@ -146,13 +195,12 @@ impl GameManager {
             if let Ok(data) = data {
                 self.equeue.push_server(ServerEvent::PlayerDataResponse{data: data.to_bytearray(), net_id: net_id});
             
-                // let pdata = Rc::new(RefCell::new(data));
                 let mut instance = self.get_instance(&data.location);
                 let player = Player::new_rc(data, &self.server_name);
                 instance.bind_mut().spawn_player(player.clone(), net_id);
                 self.player_locations.insert(net_id, instance);
     
-                PlayerDataEntry::new_active(player)
+                PlayerDataEntry::new_active(player, net_id)
             }
             else {
                 self.equeue.push_server(ServerEvent::PlayerForceDisconnect{net_id});
@@ -160,11 +208,7 @@ impl GameManager {
             }
         }
         else {
-            // Otherwise, hold the entry until it times out
-            // let pdata = Rc::new(RefCell::new(data));
-
             PlayerDataEntry::new_inactive(data.unwrap())
-            // PlayerDataEntry::new(pdata)
         };
 
         // Store the data entry
@@ -176,10 +220,12 @@ impl GameManager {
         };
     }
 
-    // Saves data stored in dataentry with pid
+    /// Saves data stored in dataentry with given pid
+    /// 
+    /// Does not save dataentries that are not active players
     fn save_dataentry(&mut self, pid: i32) {
         if let Some(dataentry) = self.player_datas.get(&pid) {
-            if let PlayerDataEntry::ActivePlayer{player, age: _} = dataentry {
+            if let PlayerDataEntry::ActivePlayer{player, net_id: _, age: _} = dataentry {
                 let data = player.borrow().data().to_bytearray();
                 self.signals().save().emit(pid, &data, false);
             }
@@ -202,9 +248,9 @@ impl GameManager {
         if let Some(pdataentry) = self.player_datas.get(&pid) {
             let data = match pdataentry {
                 PlayerDataEntry::RawData{data, age: _} => data.to_bytearray(),
-                PlayerDataEntry::ActivePlayer{player, age: _} => player.borrow().data().to_bytearray(),
+                PlayerDataEntry::ActivePlayer{player, net_id: _, age: _} => player.borrow().data().to_bytearray(),
             };
-            self.equeue.push_server(ServerEvent::PlayerDataResponse{data, net_id: net_id});
+            self.equeue.push_server(ServerEvent::PlayerDataResponse{data, net_id});
         }
         else {
             // If already waiting for the data from database, net_id to the waiting list
@@ -270,7 +316,7 @@ impl GameManager {
             
             self.player_locations.remove(&net_id);
             if let Some(pdataentry) = self.player_datas.remove(&pid) {
-                if let PlayerDataEntry::ActivePlayer{player, age: _} = pdataentry {
+                if let PlayerDataEntry::ActivePlayer{player, net_id: _, age: _} = pdataentry {
                     let data = match std::rc::Rc::try_unwrap(player) {
                         Ok(p) => p.into_inner().into_data(),
                         Err(rc) => panic!("Couldn't unwrap player rc for {net_id}! refcount: {}", std::rc::Rc::strong_count(&rc)),

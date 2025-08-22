@@ -11,15 +11,15 @@ const PLAYER_SAVE_TIMEOUT: f64 = 60.;
 
 pub enum PlayerDataEntry {
     RawData{data: PlayerData, age: f64},
-    ActivePlayer{player: Rc<RefCell<Player>>, age: f64}
+    ActivePlayer{player: Rc<RefCell<Player>>, net_id: i32, age: f64}
     // pub data: Rc<RefCell<PlayerData>>,
     // age: f64,
     // net_id: Option<i32>,
 }
 
 impl PlayerDataEntry {
-    pub fn new_active(player: Rc<RefCell<Player>>) -> Self {
-        PlayerDataEntry::ActivePlayer{player, age: 0.}
+    pub fn new_active(player: Rc<RefCell<Player>>, net_id: i32) -> Self {
+        PlayerDataEntry::ActivePlayer{player, net_id, age: 0.}
     }
 
     pub fn new_inactive(data: PlayerData) -> Self {
@@ -35,7 +35,7 @@ impl PlayerDataEntry {
                     return DataTickResult::Timeout;
                 }
             },
-            PlayerDataEntry::ActivePlayer{player: _, age} => {
+            PlayerDataEntry::ActivePlayer{player: _, net_id: _, age} => {
                 *age += delta;
                 if *age > PLAYER_SAVE_TIMEOUT {
                     *age = 0.;
@@ -48,7 +48,7 @@ impl PlayerDataEntry {
 
     pub fn is_active(&self) -> bool {
         match self {
-            PlayerDataEntry::ActivePlayer{player: _, age: _} => true,
+            PlayerDataEntry::ActivePlayer{player: _, net_id: _, age: _} => true,
             _ => false,
         }
     }

@@ -19,6 +19,7 @@ func _ready() -> void:
 	start_server()
 
 func save(pid: int, data: PackedByteArray, unlock: bool) -> void:
+	print("Saving data for pid ", pid);
 	rpc_id(1, "_save", pid, data, unlock)
 
 func retrieve(pid: int, lock: bool) -> void:

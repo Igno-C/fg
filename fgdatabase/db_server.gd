@@ -92,7 +92,8 @@ func _save(pid: int, data: PackedByteArray, unlock: bool = false) -> void:
 	
 	if unlock:
 		unlock_pid(pid)
-		
+	
+	print("Saving data for pid ", pid)
 	db.query_with_bindings(save_query, [data, pid])
 
 @rpc("any_peer", "call_remote", "reliable", 0)
@@ -114,6 +115,6 @@ func _retrieve(pid: int, lock: bool = false) -> void:
 			print("Server %s attempted lock on already locked entry for pid %s" % [server_id, pid])
 	
 	var data: PackedByteArray = entry["data"]
-	print("Retrieved data: ", data)
+	print("Retrieved data for pid ", pid)
 	
 	rpc_id(server_id, "_retrieve", pid, data)
