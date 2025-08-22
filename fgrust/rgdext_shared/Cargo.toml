@@ -4,8 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [lib]
-# crate-type = ["cdylib", "lib"]  # Compile this crate to a dynamic C library and a rust library.
-crate-type = ["lib"]
+crate-type = ["lib"] # Just a Rust library, to be imported by binaries
 
 [dependencies]
 godot = {workspace = true}

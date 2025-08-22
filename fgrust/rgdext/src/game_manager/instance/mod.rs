@@ -1,8 +1,8 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use godot::{prelude::*, classes::ResourceLoader};
+use godot::{classes::{FileAccess, ResourceLoader}, prelude::*};
 use crate::eventqueue::{EQueue, ServerEvent, GameEvent};
-use rgdext_shared::{basemap::{spatialhash::SpatialHash, BaseMap, CollisionArray}, genericevent::GenericServerResponse, playerdata::PlayerData};
+use rgdext_shared::{basemap::{spatialhash::SpatialHash, CollisionArray}, genericevent::GenericServerResponse, playerdata::PlayerData};
 use player::Player; use entity::{Entities, GenericScriptedEntity, ResponseType, ScriptResponse};
 
 pub mod player;
@@ -18,7 +18,7 @@ pub struct Instance {
     /// Or in callbacks from children, like handle_entity_response.
     equeue: EQueue,
     
-    map: Option<Gd<BaseMap>>,
+    entities_node: Option<Gd<Node>>,
     col_array: CollisionArray,
     /// Uses net_id as identifier
     spatial_hash: SpatialHash<i32, Rc<RefCell<Player>>>,
@@ -40,21 +40,21 @@ impl INode for Instance {
     fn ready(&mut self) {
         self.load_map();
 
-        if let Some(entities) = self.map.as_ref().unwrap().try_get_node_as::<Node>("Entities") {
-            for child in entities.get_children().iter_shared() {
-                if let Ok(entity) = child.try_cast::<GenericScriptedEntity>() {
-                    let e = entity.clone();
-                    let b = entity.bind();
+        // if let Some(entities) = self.map.as_ref().unwrap().try_get_node_as::<Node>("Entities") {
+        for child in self.entities_node.as_ref().unwrap().get_children().iter_shared() {
+            if let Ok(entity) = child.try_cast::<GenericScriptedEntity>() {
+                let e = entity.clone();
+                let b = entity.bind();
 
-                    if b.interactable {
-                        self.entities.register_interactable(e.clone());
-                    }
-                    if b.walkable {
-                        self.entities.register_walkable(e.clone());
-                    }
+                if b.interactable {
+                    self.entities.register_interactable(e.clone());
+                }
+                if b.walkable {
+                    self.entities.register_walkable(e.clone());
                 }
             }
         }
+        // }
 
         godot_print!("Instance {} ready with map {}", self.base().get_name(), self.mapname);
     }
@@ -148,11 +148,11 @@ impl INode for Instance {
 #[godot_api]
 impl Instance {
     pub fn new(mapname: impl ToString, equeue: EQueue) -> Gd<Instance> {
-        Gd::from_init_fn(|base| {
+        Gd::from_init_fn(|mut base| {
             Instance {
                 mapname: mapname.to_string(),
                 equeue,
-                map: None,
+                entities_node: None,
                 col_array: CollisionArray::new(),
                 spatial_hash: SpatialHash::default(),
                 players: HashMap::new(),
@@ -171,19 +171,18 @@ impl Instance {
     /// 
     /// Assumes the root node of the map scene is a BaseMap.
     fn load_map(&mut self) {
-        let m = ResourceLoader::singleton().load(&format!("res://maps/{}.tscn", &self.mapname)).unwrap();
-        let map: Gd<PackedScene> = m.cast();
-        let mut mapnode = map.instantiate_as::<BaseMap>();
+        let entities_resource = ResourceLoader::singleton().load(&format!("res://maps/{}.tscn", &self.mapname)).unwrap();
+        let entities_scene: Gd<PackedScene> = entities_resource.cast();
+        let entities_node = entities_scene.instantiate().unwrap();
 
-        mapnode.bind_mut().on_server();
-        mapnode.set_name(&self.mapname);
-        let (col_array, spatial_hash) = mapnode.bind_mut().extract_collisions();
+        let col_array_data = FileAccess::get_file_as_bytes(&format!("res://maps/{}.col", &self.mapname));
+        godot_print!("{:?}" ,col_array_data);
+        let col_array = CollisionArray::from_bytes(col_array_data.as_slice()).unwrap();
         self.col_array = col_array;
-        self.spatial_hash = spatial_hash;
+        self.spatial_hash = self.col_array.get_default_spatialhash();
 
-        self.base_mut().add_child(&mapnode);
-
-        self.map = Some(mapnode);
+        self.base_mut().add_child(&entities_node);
+        self.entities_node = Some(entities_node);
     }
 
     pub fn spawn_player(&mut self, player: Rc<RefCell<Player>>, net_id: i32) {

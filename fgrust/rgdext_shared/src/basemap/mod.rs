@@ -1,19 +1,13 @@
-use std::{cell::RefCell, rc::Rc};
-
-use godot::{prelude::*, classes::TileMapLayer};
-use spatialhash::SpatialHash;
-
-use crate::playerdata::PlayerData;
+use godot::{classes::TileMapLayer, prelude::*};
+use bitcode::{Encode, Decode};
 
 pub mod spatialhash;
 
 #[derive(GodotClass)]
-#[class(base=Node)]
+#[class(tool, base=Node)]
 pub struct BaseMap {
-    // pub drop_graphics: bool,
-
     /// Impacts how entities load
-    on_server: bool,
+    // on_server: bool,
 
     col_array: CollisionArray,
     
@@ -25,7 +19,7 @@ impl INode for BaseMap {
     fn init(base: Base<Node>) -> Self {
         Self {
             // drop_graphics: false,
-            on_server: false,
+            // on_server: false,
 
             col_array: CollisionArray::new(),
             
@@ -35,24 +29,19 @@ impl INode for BaseMap {
 
 
     fn ready(&mut self) {
-        self.bake_collisions();
-
-        if self.on_server {
-            self.drop_graphics();
-        }
-        else {
-            self.drop_entities();
+        if !godot::classes::Engine::singleton().is_editor_hint() {
+            self.col_array = self.extract_collisions(true);
         }
     }
 }
 
 #[godot_api]
 impl BaseMap {
-    /// Has to be run before adding to scenetree on the server
-    /// 
-    /// Changes how the map loads - drops all graphics, leaves just entities
-    pub fn on_server(&mut self) {
-        self.on_server = true;
+    #[func]
+    fn get_collision_bytes(&mut self) -> PackedByteArray {
+        let col_array = self.extract_collisions(false);
+
+        PackedByteArray::from(col_array.to_bytes())
     }
 
     #[func]
@@ -65,50 +54,48 @@ impl BaseMap {
         self.col_array.set_at(x, y, to);
     }
 
-    /// If the collisions were already extracted, they're set to null here
-    fn bake_collisions(&mut self) {
-        self.col_array = self.extract_collisions::<()>().0;
-    }
-
     /// Also drops the collision tilemap.
-    pub fn extract_collisions<T>(&mut self) -> (CollisionArray, SpatialHash<i32, T>) {
+    pub fn extract_collisions(&mut self, drop_node: bool) -> CollisionArray {
         // CMap is the expected name of the collision tilemap node
-        let mut tmap_c: Gd<TileMapLayer> = match self.base().try_get_node_as::<TileMapLayer>("CMap") {
+        let mut collision_tilemap: Gd<TileMapLayer> = match self.base().try_get_node_as::<TileMapLayer>("CMap") {
             Some(map) => map,
-            None => return (CollisionArray::new(), SpatialHash::default()),
+            None => return CollisionArray::new(),
         };
 
-        let rect: Rect2i = tmap_c.get_used_rect();
+        let rect: Rect2i = collision_tilemap.get_used_rect();
 
         let mut col_array = CollisionArray::from_used_rect(&rect);
 
-        let cells = tmap_c.get_used_cells();
+        let cells = collision_tilemap.get_used_cells();
         for cell in cells.iter_shared() {
             col_array.set_at(cell.x, cell.y, true);
         }
 
-        tmap_c.queue_free();
-
-        (col_array, SpatialHash::from_used_rect_default(&rect))
-    }
-
-    /// Drops all child nodes except for one named 'Entities'
-    fn drop_graphics(&mut self) {
-        for mut child in self.base().get_children().iter_shared() {
-            if child.get_name() != "Entities".into() {
-                child.queue_free();
-            }
+        if drop_node {
+            collision_tilemap.queue_free();
         }
+
+        col_array
     }
 
-    /// Drops the node named 'Entities'
-    fn drop_entities(&mut self) {
-        if let Some(mut enode) = self.base().get_node_or_null("Entities") {
-            enode.queue_free();
-        }
-    }
+    // /// Drops all child nodes except for one named 'Entities'
+    // fn drop_graphics(&mut self) {
+    //     for mut child in self.base().get_children().iter_shared() {
+    //         if child.get_name() != "Entities".into() {
+    //             child.queue_free();
+    //         }
+    //     }
+    // }
+
+    // /// Drops the node named 'Entities'
+    // fn drop_entities(&mut self) {
+    //     if let Some(mut enode) = self.base().get_node_or_null("Entities") {
+    //         enode.queue_free();
+    //     }
+    // }
 }
 
+#[derive(Encode, Decode)]
 pub struct CollisionArray {
     map: Vec<bool>,
     topleftx: i32,
@@ -130,16 +117,16 @@ impl CollisionArray {
         }
     }
 
-    pub fn new_with_dimensions(other: &Self) -> Self {
-        Self {
-            map: Vec::with_capacity(other.map.len()),
-            topleftx: other.topleftx,
-            toplefty: other.toplefty,
-            width: other.width,
-            height: other.height,
-            mapsize: other.mapsize,
-        }
-    }
+    // pub fn new_with_dimensions(other: &Self) -> Self {
+    //     Self {
+    //         map: Vec::with_capacity(other.map.len()),
+    //         topleftx: other.topleftx,
+    //         toplefty: other.toplefty,
+    //         width: other.width,
+    //         height: other.height,
+    //         mapsize: other.mapsize,
+    //     }
+    // }
 
     pub fn from_used_rect(rect: &Rect2i) -> Self {
         let topleftx = rect.position.x;
@@ -161,15 +148,30 @@ impl CollisionArray {
         }
     }
 
-    pub fn set_from_used_rect(&mut self, rect: &Rect2i) {
-        self.topleftx = rect.position.x;
-        self.toplefty = rect.position.y;
-        self.width = rect.size.x + 1;
-        self.height = rect.size.y + 1;
-        self.mapsize = self.width * self.height;
+    pub fn from_bytes(bytes: &[u8]) -> Result<CollisionArray, bitcode::Error> {
+        bitcode::decode(bytes)
+    }
 
-        self.map = Vec::with_capacity(self.mapsize as usize);
-        for _ in 0..self.mapsize as usize {self.map.push(false);}
+    pub fn to_bytes(&self) -> Vec<u8> {
+        bitcode::encode(self)
+    }
+
+    // pub fn set_from_used_rect(&mut self, rect: &Rect2i) {
+    //     self.topleftx = rect.position.x;
+    //     self.toplefty = rect.position.y;
+    //     self.width = rect.size.x + 1;
+    //     self.height = rect.size.y + 1;
+    //     self.mapsize = self.width * self.height;
+
+    //     self.map = Vec::with_capacity(self.mapsize as usize);
+    //     for _ in 0..self.mapsize as usize {self.map.push(false);}
+    // }
+
+    pub fn get_default_spatialhash<I: Eq, T>(&self) -> spatialhash::SpatialHash<I ,T> {
+        let topleft = (self.topleftx, self.toplefty);
+        let bottomright = (topleft.0 + self.width - 1, topleft.1 + self.height -1);
+
+        spatialhash::SpatialHash::new(spatialhash::GRID_SIZE, topleft, bottomright, spatialhash::CHECK_RADIUS)
     }
 
     fn to_index(&self, mut x: i32, mut y: i32) -> i32 {
