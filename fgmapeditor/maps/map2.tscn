@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=4 uid="uid://dy8e1g8atvpjs"]
+[gd_scene load_steps=7 format=4 uid="uid://dy8e1g8atvpjs"]
 
 [ext_resource type="TileSet" uid="uid://db4u7skputgfv" path="res://graphics/tilesets/baseset.tres" id="1_fpa4e"]
 [ext_resource type="Script" uid="uid://p8len3s3jsus" path="res://maps/base_map.gd" id="1_qqv0e"]
 [ext_resource type="Script" uid="uid://b3ulfsqahp2ls" path="res://entities/generic_instance_portal.gd" id="1_s43rf"]
 [ext_resource type="TileSet" uid="uid://d4dk6qwdut6ax" path="res://graphics/tilesets/collisionset.tres" id="2_n7ooa"]
 [ext_resource type="Script" uid="uid://bnlpapopcb6wh" path="res://entities/generic_portal_entity.gd" id="2_uf18y"]
+[ext_resource type="Script" uid="uid://c7bflugjvo4uh" path="res://entities/generic_tree.gd" id="4_4k56d"]
 
 [node name="BaseMap" type="BaseMap"]
 script = ExtResource("1_qqv0e")
@@ -32,6 +33,13 @@ walkable = true
 script = ExtResource("2_uf18y")
 to_where = Vector2i(5, -29)
 metadata/_custom_type_script = "uid://bnlpapopcb6wh"
+
+[node name="thetree" type="GenericScriptedEntity" parent="Entities"]
+pos = Vector2i(-3, -30)
+interactable = true
+related_scene = "tree"
+script = ExtResource("4_4k56d")
+metadata/_custom_type_script = "uid://c7bflugjvo4uh"
 
 [node name="TileMap" type="TileMapLayer" parent="."]
 use_parent_material = true

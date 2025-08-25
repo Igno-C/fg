@@ -1,12 +1,8 @@
-use godot::{builtin::Rect2i, global::godot_print};
-
-// use crate::playerdata::PlayerData;
+use godot::builtin::Rect2i;
 
 
 pub const GRID_SIZE: i32 = 8;
 pub const CHECK_RADIUS: i32 = 3;
-
-//(i32, Rc<RefCell<PlayerData>>)
 
 pub struct SpatialHash<I: Eq, T> {
     grid_size: i32,
@@ -31,8 +27,8 @@ impl<I: Eq, T> Default for SpatialHash<I, T> {
     }
 }
 
-pub enum MoveDelta<'a, I: Eq, T> {
-    Delta{hash: &'a SpatialHash<I, T>, from: (i32, i32), to: (i32, i32)},
+pub enum MoveDelta {
+    Delta{from: (i32, i32), to: (i32, i32), check_radius: i32},
     NoMove
 }
 
@@ -126,7 +122,7 @@ impl<I: Eq, T> SpatialHash<I, T> {
         return None;
     }
 
-    pub fn update_pos<'a>(&'a mut self, net_id: I, oldpos: (i32, i32), newpos: (i32, i32)) -> MoveDelta<'a, I, T> {
+    pub fn update_pos<'a>(&'a mut self, id: I, oldpos: (i32, i32), newpos: (i32, i32)) -> MoveDelta {
         let oldsmallpos = self.get_smallpos(oldpos);
         let newsmallpos = self.get_smallpos(newpos);
 
@@ -136,30 +132,62 @@ impl<I: Eq, T> SpatialHash<I, T> {
         let newi_maybe = self.smallpos_to_index(newsmallpos);
 
         if let Some(oldi) = oldi_maybe && let Some(newi) = newi_maybe {
-            if let Some(remove_index) = self.map[oldi].iter().position(|_id| _id.0 == net_id) {
+            if let Some(remove_index) = self.map[oldi].iter().position(|_id| _id.0 == id) {
                 let id = self.map[oldi].remove(remove_index);
 
                 self.map[newi].push(id);
-                return MoveDelta::Delta{hash: self, from: oldsmallpos, to: newsmallpos};
+                return MoveDelta::Delta{from: oldsmallpos, to: newsmallpos, check_radius: self.check_radius};
             }
         }
         return MoveDelta::NoMove;
     }
+
+    pub fn get(&self, pos: (i32, i32), id: I) -> Option<&T> {
+        if let Some(i) = self.smallpos_to_index(self.get_smallpos(pos)) {
+            for object in &self.map[i] {
+                if object.0 == id {
+                    return Some(&object.1)
+                }
+            }
+        }
+        return None;
+    }
 }
 
-impl<'a, I: Eq, T> MoveDelta<'a, I, T> {
-    pub fn for_each_new<F: FnMut(&(I, T)) -> ()>(self, mut closure: F) {
-        if let MoveDelta::Delta{hash, from, to} = self {
-            let radius = hash.check_radius;
-            for xdelta in -radius..=radius {
-                for ydelta in -radius..=radius {
-                    let checkpos = (to.0 + xdelta, to.1 + ydelta);
-                    let from_distance = from.0.abs_diff(checkpos.0).max(from.1.abs_diff(checkpos.1)) as i32;
-                    if from_distance > radius {
-                        if let Some(index) = hash.smallpos_to_index(checkpos) {
-                            for o in hash.map[index].iter() {
-                                closure(o);
-                            }
+impl MoveDelta {
+    // pub fn for_each_new<F: FnMut(&(I, T)) -> ()>(self, mut closure: F) {
+    //     if let MoveDelta::Delta{hash, from, to} = self {
+    //         let radius = hash.check_radius;
+    //         for xdelta in -radius..=radius {
+    //             for ydelta in -radius..=radius {
+    //                 let checkpos = (to.0 + xdelta, to.1 + ydelta);
+    //                 let from_distance = from.0.abs_diff(checkpos.0).max(from.1.abs_diff(checkpos.1)) as i32;
+    //                 if from_distance > radius {
+    //                     if let Some(index) = hash.smallpos_to_index(checkpos) {
+    //                         for o in hash.map[index].iter() {
+    //                             closure(o);
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+    
+    pub fn for_each_with<'a, I: Eq, T, F: FnMut(&(I, T)) -> ()>(&self, hash: &'a SpatialHash<I, T>, mut closure: F) {
+        let (from, to, radius) = match self {
+            MoveDelta::Delta{from, to, check_radius} => (*from, *to, *check_radius),
+            MoveDelta::NoMove => return,
+        };
+
+        for xdelta in -radius..=radius {
+            for ydelta in -radius..=radius {
+                let checkpos = (to.0 + xdelta, to.1 + ydelta);
+                let from_distance = from.0.abs_diff(checkpos.0).max(from.1.abs_diff(checkpos.1)) as i32;
+                if from_distance > radius {
+                    if let Some(index) = hash.smallpos_to_index(checkpos) {
+                        for o in hash.map[index].iter() {
+                            closure(o);
                         }
                     }
                 }
@@ -280,47 +308,47 @@ mod tests {
     }
 
     #[test]
-fn test_remove_existing_element() {
-    let mut hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (31, 31), 3);
-    let player_data = create_player_data();
-    
-    hash.insert(42, player_data, (10, 10));
-    let removed = hash.remove(42, (10, 10));
-    
-    assert!(removed.is_some());
-    assert_eq!(removed.unwrap().0, 42);
-    
-    let index = hash.pos_to_index((10, 10)).unwrap();
-    assert_eq!(hash.map[index].len(), 0);
-}
+    fn test_remove_existing_element() {
+        let mut hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (31, 31), 3);
+        let player_data = create_player_data();
+        
+        hash.insert(42, player_data, (10, 10));
+        let removed = hash.remove(42, (10, 10));
+        
+        assert!(removed.is_some());
+        assert_eq!(removed.unwrap().0, 42);
+        
+        let index = hash.pos_to_index((10, 10)).unwrap();
+        assert_eq!(hash.map[index].len(), 0);
+    }
 
-#[test]
-fn test_remove_nonexistent_element() {
-    let mut hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (31, 31), 3);
-    let player_data = create_player_data();
-    
-    hash.insert(42, player_data, (10, 10));
-    let removed = hash.remove(99, (10, 10));
-    
-    assert!(removed.is_none());
-    // Should still have the original element
-    let index = hash.pos_to_index((10, 10)).unwrap();
-    assert_eq!(hash.map[index].len(), 1);
-    assert_eq!(hash.map[index][0].0, 42);
-}
+    #[test]
+    fn test_remove_nonexistent_element() {
+        let mut hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (31, 31), 3);
+        let player_data = create_player_data();
+        
+        hash.insert(42, player_data, (10, 10));
+        let removed = hash.remove(99, (10, 10));
+        
+        assert!(removed.is_none());
+        // Should still have the original element
+        let index = hash.pos_to_index((10, 10)).unwrap();
+        assert_eq!(hash.map[index].len(), 1);
+        assert_eq!(hash.map[index][0].0, 42);
+    }
 
-#[test]
-fn test_update_position_same_cell() {
-    let mut hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (31, 31), 3);
-    let player_data = create_player_data();
-    
-    hash.insert(42, player_data, (10, 10));
-    hash.update_pos(42, (10, 10), (15, 15)); // Same cell
-    
-    let index = hash.pos_to_index((10, 10)).unwrap();
-    assert_eq!(hash.map[index].len(), 1);
-    assert_eq!(hash.map[index][0].0, 42);
-}
+    #[test]
+    fn test_update_position_same_cell() {
+        let mut hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (31, 31), 3);
+        let player_data = create_player_data();
+        
+        hash.insert(42, player_data, (10, 10));
+        hash.update_pos(42, (10, 10), (15, 15)); // Same cell
+        
+        let index = hash.pos_to_index((10, 10)).unwrap();
+        assert_eq!(hash.map[index].len(), 1);
+        assert_eq!(hash.map[index][0].0, 42);
+    }
 
     #[test]
     fn test_update_position_different_cells() {

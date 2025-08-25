@@ -1,0 +1,18 @@
+[gd_scene load_steps=3 format=3 uid="uid://gprmqsi7tc8"]
+
+[ext_resource type="Script" uid="uid://cgwh8f1hofjvj" path="res://scripts/menu/game/game_menu.gd" id="1_6aosu"]
+[ext_resource type="PackedScene" uid="uid://bdss3btvbd0nj" path="res://scenes/menu/game/Chat.tscn" id="2_bankn"]
+
+[node name="GameMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+script = ExtResource("1_6aosu")
+
+[node name="Chat" parent="." instance=ExtResource("2_bankn")]
+layout_mode = 1
+mouse_filter = 1

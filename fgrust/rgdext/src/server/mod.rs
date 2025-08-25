@@ -47,32 +47,32 @@ impl INode for Server {
         // self.set_equeue(q.bind().shared_queue.clone());
 
         // Unreliable config for player movement
-        let move_config: Dictionary = vdict! {
-            "rpc_mode": RpcMode::ANY_PEER,
-            "transfer_mode": TransferMode::UNRELIABLE_ORDERED,
-            "call_local": false,
-            "channel": 0
-        };
+        // let move_config: Dictionary = vdict! {
+        //     "rpc_mode": RpcMode::ANY_PEER,
+        //     "transfer_mode": TransferMode::UNRELIABLE_ORDERED,
+        //     "call_local": false,
+        //     "channel": 0
+        // };
 
-        let data_config: Dictionary = vdict! {
-            "rpc_mode": RpcMode::ANY_PEER,
-            "transfer_mode": TransferMode::RELIABLE,
-            "call_local": false,
-            "channel": 1
-        };
+        // let data_config: Dictionary = vdict! {
+        //     "rpc_mode": RpcMode::ANY_PEER,
+        //     "transfer_mode": TransferMode::RELIABLE,
+        //     "call_local": false,
+        //     "channel": 1
+        // };
 
-        let player_event_config: Dictionary = vdict! {
-            "rpc_mode": RpcMode::ANY_PEER,
-            "transfer_mode": TransferMode::RELIABLE,
-            "call_local": false,
-            "channel": 2
-        };
+        // let player_event_config: Dictionary = vdict! {
+        //     "rpc_mode": RpcMode::ANY_PEER,
+        //     "transfer_mode": TransferMode::RELIABLE,
+        //     "call_local": false,
+        //     "channel": 2
+        // };
 
-        self.base_mut().rpc_config("pmove", &Variant::from(move_config));
+        // self.base_mut().rpc_config("pmove", &Variant::from(move_config));
 
-        self.base_mut().rpc_config("pdata", &Variant::from(data_config));
+        // self.base_mut().rpc_config("pdata", &Variant::from(data_config));
 
-        self.base_mut().rpc_config("pevent", &Variant::from(player_event_config));
+        // self.base_mut().rpc_config("pevent", &Variant::from(player_event_config));
 
         let mut multiplayer_peer = ENetMultiplayerPeer::new_gd();
         multiplayer_peer.create_server_ex(self.port).max_clients(self.max_players).done();
@@ -87,7 +87,7 @@ impl INode for Server {
         multiplayer.connect("peer_connected", &Callable::from_object_method(&self.to_gd(), "peer_connected"));
         multiplayer.connect("peer_disconnected", &Callable::from_object_method(&self.to_gd(), "peer_disconnected"));
 
-        godot_print!("Server node ready.\n");
+        godot_print!("Server node ready.");
     }
 
     fn process(&mut self, delta: f64) {
@@ -115,9 +115,18 @@ impl INode for Server {
                 ServerEvent::PlayerForceDisconnect{net_id} => {
                     self.base().get_multiplayer().unwrap().get_multiplayer_peer().unwrap().disconnect_peer(net_id);
                 },
+                ServerEvent::PlayerChat{from, text, is_dm, net_id} => {
+                    self.base_mut().rpc_id(net_id.into(), "pchat", vslice![from, text, net_id]);
+                }
                 ServerEvent::GenericResponse{response, net_id} => {
-                    let data = response.to_bytearray();
-                    self.base_mut().rpc_id(net_id.into(), "pevent", vslice![data]);
+                    // let data = response.to_bytearray();
+                    self.base_mut().rpc_id(net_id.into(), "pevent", vslice![response]);
+                }
+                ServerEvent::EntityMoveResponse{x, y, speed, entity_id, data_version, net_id} => {
+                    self.base_mut().rpc_id(net_id.into(), "emove", vslice![x, y, speed, data_version, entity_id]);
+                },
+                ServerEvent::EntityDataResponse{data, entity_id, net_id} => {
+                    self.base_mut().rpc_id(net_id.into(), "edata", vslice![data, entity_id]);
                 }
             }
         };
@@ -223,8 +232,8 @@ impl Server {
         godot_print!("disconnected: {net_id}");
     }
 
-    // #[rpc(any_peer, unreliable_ordered, call_remote, channel=0)]
-    #[func]
+    
+    #[rpc(any_peer, unreliable_ordered, call_remote, channel=0)]
     fn pmove(&mut self, x: i32, y: i32, speed: i32) {
         let net_id = self.base().get_multiplayer().unwrap().get_remote_sender_id();
         self.equeue.push_game(
@@ -232,7 +241,8 @@ impl Server {
         );
     }
 
-    #[func]
+    
+    #[rpc(any_peer, reliable, call_remote, channel=1)]
     fn pdata(&mut self, pid: i32) {
         let net_id = self.base().get_multiplayer().unwrap().get_remote_sender_id();
         self.equeue.push_game(
@@ -240,7 +250,7 @@ impl Server {
         );
     }
 
-    #[func]
+    #[rpc(any_peer, reliable, call_remote, channel=2)]
     fn pevent(&mut self, pevent_bytes: PackedByteArray) {
         let net_id = self.base().get_multiplayer().unwrap().get_remote_sender_id();
         let event = GenericPlayerEvent::from_bytes(pevent_bytes.as_slice());
@@ -250,11 +260,27 @@ impl Server {
     }
 
     /// If target_pid is -1, that means zone chat
-    #[func]
-    fn pchat(&mut self, text: GString, target_pid: i32) {
+    #[rpc(any_peer, reliable, call_remote, channel=3)]
+    fn pchat(&mut self, mut text: GString, target_pid: i32) {
         let net_id = self.base().get_multiplayer().unwrap().get_remote_sender_id();
+        if text.len() > 400 {
+            text = text.left(400);
+        }
         self.equeue.push_game(
             GameEvent::PlayerChat{text, target_pid, net_id}
+        );
+    }
+
+    #[rpc(authority, reliable, call_remote, channel=4)]
+    fn emove(&mut self) {
+
+    }
+
+    #[rpc(any_peer, reliable, call_remote, channel=4)]
+    fn edata(&mut self, x: i32, y: i32, entity_id: i32) {
+        let net_id = self.base().get_multiplayer().unwrap().get_remote_sender_id();
+        self.equeue.push_game(
+            GameEvent::EDataRequest{x, y, entity_id, net_id}
         );
     }
 }

@@ -11,14 +11,13 @@ var predictions = []
 var go_to_target: bool = false
 var target: Vector2i = Vector2i.ZERO
 
-const MLEFT: int = 0; const MRIGHT: int = 1; const MUP: int = 2; const MDOWN: int = 3
-#var pressed_moves: Array[int] = []
-#var unpressed_moves: Array[int] = [] # Used to buffer inputs to never miss them
+#const MLEFT: int = 0; const MRIGHT: int = 1; const MUP: int = 2; const MDOWN: int = 3
 # speed 3 is normal, 2 is sprint, 1 is fastest
 var next_speed: int = 3
 var previous_speed: int = 3
 var ticks_since_move: int = 100
 
+var pis = PlayerInputState.new()
 
 signal send_move(x: int, y: int, speed: int)
 signal send_event(event: GenericEvent)
@@ -28,32 +27,20 @@ func _process(_delta:) -> void:
 	if not go_to_target:
 		target = player.pos
 	
-	if Input.is_action_pressed("Up"): target.y = player.pos.y - 1
-	elif Input.is_action_pressed("Down"): target.y = player.pos.y + 1
-	elif Input.is_action_just_released("Up"): target.y = player.pos.y
-	elif Input.is_action_just_released("Down"): target.y = player.pos.y
+	if pis.up_pressed: target.y = player.pos.y - 1
+	elif pis.up_just_released: target.y = player.pos.y
+	if pis.down_pressed: target.y = player.pos.y + 1
+	elif pis.down_just_released: target.y = player.pos.y
+	if pis.left_pressed: target.x = player.pos.x - 1
+	elif pis.left_just_released: target.x = player.pos.x
+	if pis.right_pressed: target.x = player.pos.x + 1
+	elif pis.right_just_released: target.x = player.pos.x
 	
-	if Input.is_action_pressed("Right"): target.x = player.pos.x + 1
-	elif Input.is_action_pressed("Left"): target.x = player.pos.x - 1
-	elif Input.is_action_just_released("Right"): target.x = player.pos.x
-	elif Input.is_action_just_released("Left"): target.x = player.pos.x
+	if pis.sprint_pressed: next_speed = 2
+	else: next_speed = 3
 	
-	if Input.is_action_just_released("Sprint"): next_speed = 3 # Note, bigger speed means slower
-	if Input.is_action_just_pressed("Sprint"): next_speed = 2
-	
-	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-		var ipos := get_mouse_ipos()
-		target = ipos
-	if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
-		var ipos := get_mouse_ipos()
-		print(ipos)
-		#var target := player.pos + player.get_dir_vec()
-		send_event.emit(GenericEvent.interaction(ipos.x, ipos.y))
-	
-	if target != player.pos:
-		go_to_target = true
-	else:
-		go_to_target = false
+	go_to_target = target != player.pos
+	pis.tick()
 
 func get_mouse_ipos() -> Vector2i:
 	var pos: Vector2 = camera.get_local_mouse_position() + camera.global_position
@@ -62,16 +49,18 @@ func get_mouse_ipos() -> Vector2i:
 	var ipos: Vector2i = Vector2i(pos.floor())
 	return ipos
 
-#func _input(event: InputEvent) -> void:
-	#if player == null:
-		#return
-	#if event is InputEventMouseButton:
-		#if event.button_index == 1:
-			#var pos: Vector2 = camera.get_local_mouse_position() + camera.global_position
-			#pos /= 50.0
-			#
-			#var ipos: Vector2i = Vector2i(pos.floor())
-			#print(ipos)
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			var ipos := get_mouse_ipos()
+			target = ipos
+			go_to_target = true
+		elif event.button_index == MOUSE_BUTTON_RIGHT:
+			var ipos := get_mouse_ipos()
+			print(ipos)
+			send_event.emit(GenericEvent.interaction(ipos.x, ipos.y))
+	else:
+		pis.take_event(event)
 
 func set_player(p: PlayerEntity) -> void:
 	player = p
@@ -103,16 +92,10 @@ func on_tick() -> void:
 			print("sent ", nextpos, ", speed: ", next_speed)
 		else:
 			go_to_target = false
-			target = player.pos
 			print("didn't send ", nextpos, ", speed: ", next_speed, " (predicted collision)")
-	
-	#for move in unpressed_moves:
-		#pressed_moves.erase(move)
-	#unpressed_moves.clear()
 
 func receive_move(x: int, y: int, speed: int) -> void:
 	var pred = predictions.pop_front()
-	set_debug_label.emit(str(predictions))
 	if pred != null:
 		var predpos = pred[0]; var predspeed = pred[1]
 		if x == predpos.x and y == predpos.y and speed == predspeed:
@@ -126,25 +109,15 @@ func receive_move(x: int, y: int, speed: int) -> void:
 					return # The next prediction was correct
 				print("Prediction mismatch, received: (", x, ", ", y, "), predicted: (", predpos, ")")
 				predictions.clear()
-	player.move(Vector2i(x, y), 0); ticks_since_move = 0; previous_speed = 0
+	
+	var to_pos := Vector2i(x, y)
+	player.move(to_pos, 0)
+	target = to_pos
+	ticks_since_move = 0
+	previous_speed = 0
 
 func delta_from_target() -> Vector2i:
 	var delta: Vector2i = target - player.pos
 	delta = delta.clampi(-1, 1)
 	
 	return player.pos + delta
-
-#func delta_from_direction() -> Vector2i:
-	#if pressed_moves.is_empty():
-		#return Vector2i.ZERO
-	#match pressed_moves[-1]:
-		#MUP:
-			#return Vector2i.UP
-		#MDOWN:
-			#return Vector2i.DOWN
-		#MLEFT:
-			#return Vector2i.LEFT
-		#MRIGHT:
-			#return Vector2i.RIGHT
-		#_:
-			#return Vector2i.ZERO

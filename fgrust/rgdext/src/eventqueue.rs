@@ -65,17 +65,22 @@ impl EQueue {
         iter
     }
 
-    pub fn to_string(&self) -> String {
-        format!("<EQueue with pointers {:?} and {:?}>", self.game_events.as_ptr(), self.server_events.as_ptr())
-    }
+    // pub fn to_string(&self) -> String {
+    //     format!("<EQueue with pointers {:?} and {:?}>", self.game_events.as_ptr(), self.server_events.as_ptr())
+    // }
 }
 
+/// For PackedByteArray values, serialization is expected to happen at event creation
 pub enum ServerEvent {
     PlayerMoveResponse{x: i32, y: i32, speed: i32, pid: i32, data_version: i32, net_id: i32},
     PlayerDataResponse{data: PackedByteArray, net_id: i32},
     PlayerForceDisconnect{net_id: i32},
+    PlayerChat{from: GString, text: GString, is_dm: bool, net_id: i32},
 
-    GenericResponse{response: GenericServerResponse, net_id: i32}
+    EntityMoveResponse{x: i32, y: i32, speed: i32, entity_id: i32, data_version: i32, net_id: i32},
+    EntityDataResponse{data: Dictionary, entity_id: i32, net_id: i32},
+
+    GenericResponse{response: PackedByteArray, net_id: i32}
 }
 
 pub enum GameEvent {
@@ -83,9 +88,13 @@ pub enum GameEvent {
     PlayerJoined{net_id: i32, pid: i32},
     PlayerDisconnected{net_id: i32},
     /// Joins player to an instance by the given map name
+    /// 
+    /// You might be asking yourself, could this possibly not be an event? No, because it happens at Instance level, but needs to be handled at GameManager level
     PlayerJoinInstance{mapname: String, x: i32, y: i32, net_id: i32},
     PlayerChat{text: GString, target_pid: i32, net_id: i32},
+    PlayerDm{from: GString, text: GString, target_pid: i32},
     GenericEvent{event: GenericPlayerEvent, net_id: i32},
     /// net_id of the user requesting, pid of the user whose data is requested
-    PDataRequest{pid: i32, net_id: i32}
+    PDataRequest{pid: i32, net_id: i32},
+    EDataRequest{x: i32, y: i32, entity_id: i32, net_id: i32}
 }

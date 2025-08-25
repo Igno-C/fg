@@ -1,7 +1,7 @@
 class_name GameManager
 extends Node
 
-@onready var server: Server = get_node("/root/ServerNode")
+#@onready var server: Server = get_node("/root/ServerNode")
 @onready var ticker: Timer = get_node("/root/Ticker")
 @onready var game_node: Node2D = get_node("/root/Main/Game")
 
@@ -10,30 +10,29 @@ var map: BaseMap = null
 
 var player_pid = -1
 var players: Dictionary[int, PlayerEntity] = {}
+var entities: Dictionary[int, GenericEntity] = {}
 #var player_datas: Dictionary[int, PlayerContainer] = {}
 
 signal set_debug_label(text: String)
 
 func _ready() -> void:
-	server.player_update.connect(_on_player_update)
-	server.data_update.connect(_on_data_update)
-	server.generic_response.connect(_on_generic_response)
+	ServerNode.player_update.connect(_on_player_update)
+	ServerNode.data_update.connect(_on_data_update)
+	ServerNode.generic_response.connect(_on_generic_response)
+	#server.entity_update.connect(_on_entity_update)
 
 func _on_player_update(x: int, y: int, speed: int, data_version: int, pid: int) -> void:
 	print("pid %s got update: %s, %s, %s, dataver %s" % [pid, x, y, speed, data_version])
 	var p: PlayerEntity
-	# Gets player or spawns if new
 	if not players.has(pid):
 		p = spawn_player(pid)
 	else:
 		p = players[pid]
 	
 	if p.data_version < data_version:
-		server.send_data_request(pid)
+		ServerNode.send_data_request(pid)
 		p.data_version = data_version
 	
-	# Forwards the move info to the given player
-	# or to the controller if it's the user player
 	if pid == player_pid:
 		player_controller.receive_move(x, y, speed)
 	else:
@@ -105,7 +104,7 @@ func spawn_player_controller() -> void:
 	var pc: Script = load("res://scripts/player/player_controller.gd")
 	player_controller = pc.new()
 	player_controller.set_debug_label.connect(set_debug_label.emit)
-	player_controller.send_move.connect(server.send_move)
-	player_controller.send_event.connect(server.send_event)
+	player_controller.send_move.connect(ServerNode.send_move)
+	player_controller.send_event.connect(ServerNode.send_event)
 	ticker.timeout.connect(player_controller.on_tick)
 	game_node.add_child(player_controller)

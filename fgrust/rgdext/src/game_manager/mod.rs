@@ -68,6 +68,7 @@ impl INode for GameManager {
         let mut db_server: Gd<Node> = self.base().get_node_as("/root/DbServer");
         db_server.connect("retrieved", &Callable::from_object_method(&self.to_gd(), "_on_db_retrieved"));
         db_server.connect("request_save", &Callable::from_object_method(&self.to_gd(), "_on_save_request"));
+        db_server.connect("dm_received", &Callable::from_object_method(&self.to_gd(), "_on_dm_received"));
         self.base_mut().connect("save", &Callable::from_object_method(&db_server, "save"));
         self.base_mut().connect("retrieve", &Callable::from_object_method(&db_server, "retrieve"));
 
@@ -85,17 +86,6 @@ impl INode for GameManager {
 
             godot_print!("Doing full save before quitting");
             self.full_save();
-            // godot_print!("Waiting 5 seconds");
-
-            // self.base().get_tree().unwrap()
-            //     .create_timer(5.).unwrap()
-            //     .signals().timeout()
-            //     .connect_other(&self.to_gd(),
-            //         |a| {
-            //             godot_print!("Quitting now");
-            //             a.base().get_tree().unwrap().quit();
-            //         }
-            // );
         }
 
         let mut saves = Vec::with_capacity(10);
@@ -124,8 +114,10 @@ impl INode for GameManager {
                 GameEvent::PlayerDisconnected{net_id} => self.player_despawn(net_id),
                 GameEvent::PlayerJoinInstance{mapname, x, y, net_id} => self.player_join_instance(&mapname, x, y, net_id),
                 GameEvent::PlayerChat{text, target_pid, net_id} => {self.broadcast_chat(text, target_pid, net_id)},
+                GameEvent::PlayerDm{from, text, target_pid} => {self.signals().relay_dm().emit(&from, &text, target_pid);},
                 GameEvent::GenericEvent{event, net_id} => self.handle_generic_event(event, net_id),
-                GameEvent::PDataRequest{pid, net_id} => self.player_retrieve_data(net_id, pid),
+                GameEvent::PDataRequest{pid, net_id} => self.player_retrieve_data(pid, net_id),
+                GameEvent::EDataRequest{x, y, entity_id, net_id} => self.player_retrieve_edata(x, y, entity_id, net_id),
             }
         }
     }
@@ -138,6 +130,9 @@ impl GameManager {
 
     #[signal]
     fn save(pid: i32, data: PackedByteArray, unlock: bool);
+
+    #[signal]
+    fn relay_dm(from: GString, text: GString, target_pid: i32);
 
     pub fn set_equeue(&mut self, e: EQueue) {
         self.equeue = e;
@@ -220,6 +215,17 @@ impl GameManager {
         };
     }
 
+    #[func]
+    fn _on_dm_received(&self, from: GString, text: GString, target_pid: i32) {
+        if let Some(dataentry) = self.player_datas.get(&target_pid) {
+            if let PlayerDataEntry::ActivePlayer{player: _, net_id, age: _} = dataentry {
+                self.equeue.push_server(
+                    ServerEvent::PlayerChat{from, text, is_dm: true, net_id: *net_id}
+                );
+            }
+        }
+    }
+
     /// Saves data stored in dataentry with given pid
     /// 
     /// Does not save dataentries that are not active players
@@ -244,7 +250,7 @@ impl GameManager {
         drop(b); drop(player);
     }
 
-    fn player_retrieve_data(&mut self, net_id: i32, pid: i32) {
+    fn player_retrieve_data(&mut self, pid: i32, net_id: i32) {
         if let Some(pdataentry) = self.player_datas.get(&pid) {
             let data = match pdataentry {
                 PlayerDataEntry::RawData{data, age: _} => data.to_bytearray(),
@@ -262,6 +268,12 @@ impl GameManager {
                 self.datagets.insert(pid, vec![net_id]);
                 self.signals().retrieve().emit(pid, false);
             }
+        }
+    }
+
+    fn player_retrieve_edata(&mut self, x: i32, y: i32, entity_id: i32, net_id: i32) {
+        if let Some(instance) = self.player_locations.get_mut(&net_id) {
+            instance.bind_mut().get_entity_data(x, y, entity_id, net_id);
         }
     }
 
@@ -371,7 +383,9 @@ impl GameManager {
         }
     }
 
-    fn broadcast_chat(&self, text: GString, target_pid: i32, net_id: i32) {
-
+    fn broadcast_chat(&mut self, text: GString, target_pid: i32, net_id: i32) {
+        if let Some(instance) = self.player_locations.get_mut(&net_id) {
+            instance.bind_mut().broadcast_chat(text, target_pid, net_id);
+        }
     }
 }

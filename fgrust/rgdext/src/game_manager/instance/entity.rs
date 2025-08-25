@@ -10,15 +10,35 @@ use rgdext_shared::basemap::spatialhash::SpatialHash;
 #[class(base=Node)]
 pub struct GenericScriptedEntity {
     #[export]
+    /// Position of the entity in the world.
     pub pos: Vector2i,
     #[export]
+    /// Whether the entity can be interacted with.
+    /// 
+    /// Interaction response is based on the [method _on_player_interaction] method.
     pub interactable: bool,
     #[export]
+    /// If interactable, what's the max Chebyshev distance the entity can be interacted with. 0 means just the position.
     pub interactable_distance: i32,
     #[export]
+    /// Whether the entity should trigger on being walked on.
+    /// 
+    /// Walked on response is based on the [method _on_player_walk] method.
     pub walkable: bool,
     #[export]
+    /// Whether the entity has a client scene that should be shown to the clients.
+    /// 
+    /// Set to the name of the scene minus .tscn suffix. Leave empty to leave the entity invisible to clients.
     pub related_scene: GString,
+
+    #[export]
+    /// Custom entity data that gets synchronised between client and server.
+    /// The client scene may use this to show visual effects, or whatever else the client scene has implemented.
+    /// 
+    /// Change either using [method set_public_value], or by calling [method increment_data_version]
+    /// to update the data version for client synchronization.
+    public_data: Dictionary,
+    public_data_version: i32,
 
     base: Base<Node>
 }
@@ -32,6 +52,8 @@ impl INode for GenericScriptedEntity {
             interactable_distance: 0,
             walkable: false,
             related_scene: "".to_godot(),
+            public_data: Dictionary::new(),
+            public_data_version: 0,
             
             base
         }
@@ -54,14 +76,33 @@ impl GenericScriptedEntity {
         self.base_mut().emit_signal("entity_response", vslice![this, response]);
     }
 
-    #[func(virtual)]
-    pub fn on_player_walk(&mut self, net_id: i32) -> Gd<ScriptResponse> {
+    #[func]
+    fn set_public_value(&mut self, key: Variant, value: Variant) {
+        self.public_data_version += 1;
+        self.public_data.set(key, value);
+    }
+
+    #[func]
+    fn increment_data_version(&mut self) {
+        self.public_data_version += 1;
+    }
+
+    #[func(gd_self, virtual)]
+    pub fn on_player_walk(slf: Gd<Self>, net_id: i32) -> Gd<ScriptResponse> {
         ScriptResponse::null_response()
     }
 
-    #[func(virtual)]
-    pub fn on_player_interaction(&mut self, net_id: i32) -> Gd<ScriptResponse> {
+    #[func(gd_self, virtual)]
+    pub fn on_player_interaction(slf: Gd<Self>, net_id: i32) -> Gd<ScriptResponse> {
         ScriptResponse::null_response()
+    }
+
+    pub fn get_data(&self) -> Dictionary {
+        self.public_data.clone()
+    }
+
+    pub fn get_data_version(&self) -> i32 {
+        self.public_data_version
     }
 }
 
@@ -116,6 +157,7 @@ impl ResponseType {
 // Struct that holds a list of interactable entities
 #[derive(Default)]
 pub struct Entities {
+    // Used to give registered visible entities unique ids
     last_id: i32,
 
     interactables: HashMap<(i32, i32), Gd<GenericScriptedEntity>>,
@@ -130,6 +172,10 @@ impl Entities {
 
     pub fn get_walkable_at(&mut self, x: i32, y: i32) -> Option<&mut Gd<GenericScriptedEntity>> {
         return self.walkables.get_mut(&(x, y));
+    }
+
+    pub fn get_visible_hash(&self) -> &SpatialHash<i32, Gd<GenericScriptedEntity>> {
+        &self.visibles
     }
 
     pub fn register_interactable(&mut self, entity: Gd<GenericScriptedEntity>) {

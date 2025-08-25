@@ -7,7 +7,6 @@ use player::Player; use entity::{Entities, GenericScriptedEntity, ResponseType, 
 
 pub mod player;
 mod entity;
-// mod spatialhash;
 
 #[derive(GodotClass)]
 #[class(no_init, base=Node)]
@@ -40,7 +39,7 @@ impl INode for Instance {
     fn ready(&mut self) {
         self.load_map();
 
-        // if let Some(entities) = self.map.as_ref().unwrap().try_get_node_as::<Node>("Entities") {
+        // Registering registerable entities
         for child in self.entities_node.as_ref().unwrap().get_children().iter_shared() {
             if let Ok(entity) = child.try_cast::<GenericScriptedEntity>() {
                 let e = entity.clone();
@@ -52,9 +51,11 @@ impl INode for Instance {
                 if b.walkable {
                     self.entities.register_walkable(e.clone());
                 }
+                if !b.related_scene.is_empty() {
+                    self.entities.register_visible(e);
+                }
             }
         }
-        // }
 
         godot_print!("Instance {} ready with map {}", self.base().get_name(), self.mapname);
     }
@@ -114,22 +115,24 @@ impl INode for Instance {
                         if !col_array.get_at(nextx, nexty) {
                             p.set_full_pos(nextx, nexty, nextspeed);
                             // Updating player on all players that just entered their spatial hash adjacency
-                            self.spatial_hash.update_pos(*net_id, (x, y), (nextx, nexty)).for_each_new(
-                                |(_net_id, pdata)| {
-                                    let b = pdata.borrow();
-                                    self.equeue.push_server(ServerEvent::PlayerMoveResponse{
-                                        x: b.x(),
-                                        y: b.y(),
-                                        speed: 0,
-                                        pid: b.pid(),
-                                        data_version: b.data_version(),
-                                        net_id: *net_id
-                                    });
-                                }
-                            );
+                            let delta = self.spatial_hash.update_pos(*net_id, (x, y), (nextx, nexty));
+                            delta.for_each_with(&self.spatial_hash, |(other_net_id, pdata)| {
+                                let b = pdata.borrow();
+                                self.equeue.push_server(ServerEvent::PlayerMoveResponse{
+                                    x: b.x(),
+                                    y: b.y(),
+                                    speed: 0,
+                                    pid: b.pid(),
+                                    data_version: b.data_version(),
+                                    net_id: *net_id
+                                });
+                            });
+                            delta.for_each_with(self.entities.get_visible_hash(), |(entity_id, entity)| {
+                                
+                            });
 
                             if let Some(entity) = self.entities.get_walkable_at(nextx, nexty) {
-                                let res = entity.bind_mut().on_player_walk(*net_id);
+                                let res = GenericScriptedEntity::on_player_walk(entity.clone(), *net_id);
                                 self.deferred_responses.push((entity.clone(), res));
                             }
                         }
@@ -148,7 +151,7 @@ impl INode for Instance {
 #[godot_api]
 impl Instance {
     pub fn new(mapname: impl ToString, equeue: EQueue) -> Gd<Instance> {
-        Gd::from_init_fn(|mut base| {
+        Gd::from_init_fn(|base| {
             Instance {
                 mapname: mapname.to_string(),
                 equeue,
@@ -196,7 +199,7 @@ impl Instance {
         self.playercount += 1;
 
         self.equeue.push_server(
-            ServerEvent::GenericResponse{response: GenericServerResponse::LoadMap{mapname: self.mapname.clone()}, net_id}
+            ServerEvent::GenericResponse{response: GenericServerResponse::LoadMap{mapname: self.mapname.clone()}.to_bytearray(), net_id}
         );
 
         // Initial update about nearby player on spawn
@@ -254,13 +257,15 @@ impl Instance {
 
     pub fn handle_interaction(&mut self, x: i32, y: i32, net_id: i32) {
         if let Some(interactable) = self.entities.get_interactable_at(x, y) {
-            let mut b = interactable.bind_mut();
+            let b = interactable.bind_mut();
             let (ex, ey) = (b.pos.x, b.pos.y);
             let dist = x.abs_diff(ex).max(y.abs_diff(ey)) as i32;
 
             if dist <= b.interactable_distance {
-                let response = b.on_player_interaction(net_id);
                 drop(b);
+                let response = GenericScriptedEntity::on_player_interaction(interactable.clone(), net_id);
+                // let response = b.on_player_interaction(net_id);
+                // drop(b);
                 let interactable = interactable.clone();
     
                 self.handle_entity_response(interactable, response);
@@ -268,8 +273,30 @@ impl Instance {
         }
     }
 
-    // #[func]
-    // pub fn register_interactable(&mut self, entity: Gd<GenericScriptedEntity>) {
-    //     self.entities.register_interactable(entity);
-    // }
+    /// Pushes response with empty dictionary if invalid entity targeted
+    pub fn get_entity_data(&self, x: i32, y: i32, entity_id: i32, net_id: i32) {
+        let data = self.entities.get_visible_hash().get((x, y), entity_id)
+            .map_or(Dictionary::new(), |entity| {entity.bind().get_data()});
+        self.equeue.push_server(
+            ServerEvent::EntityDataResponse{data, entity_id, net_id}
+        );
+    }
+
+    pub fn broadcast_chat(&mut self, text: GString, target_pid: i32, net_id: i32) {
+        if let Some(player) = self.players.get(&net_id) {
+            let from = GString::from(&player.borrow().data().name);
+
+            // Target pid -1 means broadcast to all
+            if target_pid == -1 {
+                for target_net_id in self.players.keys() {
+                    self.equeue.push_server(
+                        ServerEvent::PlayerChat{from: from.clone(), text: text.clone(), is_dm: false, net_id: *target_net_id}
+                    );
+                }
+            }
+            else {
+                self.equeue.push_game(GameEvent::PlayerDm{from, text, target_pid});
+            }
+        }
+    }
 }

@@ -1,0 +1,58 @@
+[gd_scene load_steps=2 format=3 uid="uid://bdss3btvbd0nj"]
+
+[ext_resource type="Script" uid="uid://c7b7a2uk6obqt" path="res://scripts/menu/game/chat.gd" id="1_og1ht"]
+
+[node name="Chat" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+focus_mode = 1
+script = ExtResource("1_og1ht")
+
+[node name="ChatBox" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_top = -260.0
+offset_right = 420.0
+grow_vertical = 0
+color = Color(0.25098, 0.25098, 0.25098, 0.309804)
+
+[node name="VBox" type="VBoxContainer" parent="ChatBox"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ChatText" type="RichTextLabel" parent="ChatBox/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+focus_mode = 2
+bbcode_enabled = true
+scroll_following = true
+selection_enabled = true
+
+[node name="LineEdit" type="LineEdit" parent="ChatBox/VBox"]
+layout_mode = 2
+context_menu_enabled = false
+clear_button_enabled = true
+
+[node name="HideButton" type="Button" parent="."]
+layout_mode = 0
+offset_top = 388.0
+offset_right = 22.0
+offset_bottom = 410.0
+focus_mode = 0
+theme_override_font_sizes/font_size = 10
+text = "←"
+
+[connection signal="focus_entered" from="ChatBox/VBox/ChatText" to="." method="_on_chat_text_focus" binds= [true]]
+[connection signal="focus_exited" from="ChatBox/VBox/ChatText" to="." method="_on_chat_text_focus" binds= [false]]
+[connection signal="text_submitted" from="ChatBox/VBox/LineEdit" to="." method="_on_chat_send"]
+[connection signal="pressed" from="HideButton" to="." method="_on_hide_pressed"]

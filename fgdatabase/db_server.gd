@@ -84,10 +84,10 @@ func _save(pid: int, data: PackedByteArray, unlock: bool = false) -> void:
 		print("Tried to save to nonexistend pid: ", pid)
 		return
 	
-	var lock = db.query_result_by_reference[0]["lock_id"]
-	if lock != server_id:
+	var lock_id = db.query_result_by_reference[0]["lock_id"]
+	if lock_id != server_id:
 		print("Server %s tried to save to entry with pid %s it didn't have lock to" % [server_id, pid])
-		print("Lock: ", lock)
+		print("Lock: ", lock_id)
 		return
 	
 	if unlock:
@@ -106,15 +106,30 @@ func _retrieve(pid: int, lock: bool = false) -> void:
 		return
 	var entry: Dictionary = db.query_result_by_reference[0]
 	
-	var lock_id = entry.get("lock_id")
 	if lock:
+		var lock_id = entry["lock_id"]
 		if lock_id == null:
 			print("Locking entry for pid %s by server %s" % [pid, server_id])
 			lock_pid(pid, server_id)
 		else:
 			print("Server %s attempted lock on already locked entry for pid %s" % [server_id, pid])
+			rpc_id(server_id, "_retrieve", pid, PackedByteArray())
+			return
 	
 	var data: PackedByteArray = entry["data"]
 	print("Retrieved data for pid ", pid)
 	
 	rpc_id(server_id, "_retrieve", pid, data)
+
+@rpc("any_peer", "call_remote", "reliable", 1)
+func relay_dm(from: String, text: String, target_pid: int) -> void:
+	db.query_with_bindings(check_lock_query, [target_pid])
+	
+	if db.query_result_by_reference.is_empty():
+		return
+	
+	var lock_id = db.query_result_by_reference[0]["lock_id"]
+	if lock_id != null:
+		rpc_id(lock_id, "relay_dm", from, text, target_pid)
+	else:
+		print("Received dm relay for unlocked pid: ", target_pid)

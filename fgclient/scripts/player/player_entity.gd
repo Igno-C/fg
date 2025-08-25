@@ -1,6 +1,6 @@
 class_name PlayerEntity
 
-extends GenericEntity
+extends GenericMovable
 
 @onready var sprite: Sprite2D = get_node("Sprite2D")
 @onready var name_label: Label = get_node("NameLabel")

@@ -54,11 +54,13 @@ vertical_alignment = 1
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 placeholder_text = "Username"
+context_menu_enabled = false
 
 [node name="PasswordEdit" type="LineEdit" parent="LoginBox/Margin/VBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 placeholder_text = "Password"
+context_menu_enabled = false
 secret = true
 
 [node name="LoginButton" type="Button" parent="LoginBox/Margin/VBox"]
