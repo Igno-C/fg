@@ -1,5 +1,5 @@
 use godot::prelude::*;
-use rgdext_shared::genericevent::{GenericPlayerEvent, GenericServerResponse};
+use rgdext_shared::genericevent::GenericPlayerEvent;
 use std::{rc::Rc, cell::RefCell};
 
 
@@ -75,10 +75,11 @@ pub enum ServerEvent {
     PlayerMoveResponse{x: i32, y: i32, speed: i32, pid: i32, data_version: i32, net_id: i32},
     PlayerDataResponse{data: PackedByteArray, net_id: i32},
     PlayerForceDisconnect{net_id: i32},
+    /// If from is empty, will be displayed as a raw text message
     PlayerChat{from: GString, text: GString, is_dm: bool, net_id: i32},
 
     EntityMoveResponse{x: i32, y: i32, speed: i32, entity_id: i32, data_version: i32, net_id: i32},
-    EntityDataResponse{data: Dictionary, entity_id: i32, net_id: i32},
+    EntityDataResponse{interactable: bool, walkable: bool, related_scene: GString, data: Dictionary, entity_id: i32, net_id: i32},
 
     GenericResponse{response: PackedByteArray, net_id: i32}
 }

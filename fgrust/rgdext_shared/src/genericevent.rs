@@ -16,11 +16,32 @@ pub struct GenericEvent {
 #[godot_api]
 impl GenericEvent {
     #[func]
-    fn interaction(x: i32, y: i32) -> Gd<Self> {
+    fn interaction(x: i32, y: i32, entity_id: i32) -> Gd<Self> {
         Gd::from_init_fn(|base| {
-            Self{event: GenericPlayerEvent::Interaction{x, y}, base}
+            Self{event: GenericPlayerEvent::Interaction{x, y, entity_id}, base}
         })
     }
+
+    #[func]
+    fn swap_items(from_index: i32, to_index: i32) -> Gd<Self> {
+        Gd::from_init_fn(|base| {
+            Self{event: GenericPlayerEvent::SwapItems{from: from_index as usize, to: to_index as usize}, base}
+        })
+    }
+
+    #[func]
+    fn equip_item(from_index: i32) -> Gd<Self> {
+        Gd::from_init_fn(|base| {
+            Self{event: GenericPlayerEvent::EquipItem{from: from_index as usize}, base}
+        })
+    }
+
+    // #[func]
+    // fn interaction_with_item(x: i32, y: i32, item_index: i32) -> Gd<Self> {
+    //     Gd::from_init_fn(|base| {
+    //         Self{event: GenericPlayerEvent::Interaction{x, y, item_index: Some(item_index as usize)}, base}
+    //     })
+    // }
 
     #[func]
     pub fn to_bytearray(&self) -> PackedByteArray {
@@ -30,7 +51,9 @@ impl GenericEvent {
 
 #[derive(Decode, Encode, Clone)]
 pub enum GenericPlayerEvent {
-    Interaction{x: i32, y: i32},
+    Interaction{x: i32, y: i32, entity_id: i32},
+    SwapItems{from: usize, to: usize},
+    EquipItem{from: usize},
     Err
 }
 

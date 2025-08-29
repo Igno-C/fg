@@ -9,7 +9,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-focus_mode = 1
+mouse_filter = 2
 script = ExtResource("1_og1ht")
 
 [node name="ChatBox" type="ColorRect" parent="."]
@@ -18,7 +18,7 @@ anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_top = -260.0
-offset_right = 420.0
+offset_right = 380.0
 grow_vertical = 0
 color = Color(0.25098, 0.25098, 0.25098, 0.309804)
 
@@ -44,10 +44,14 @@ context_menu_enabled = false
 clear_button_enabled = true
 
 [node name="HideButton" type="Button" parent="."]
-layout_mode = 0
-offset_top = 388.0
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_top = -282.0
 offset_right = 22.0
-offset_bottom = 410.0
+offset_bottom = -260.0
+grow_vertical = 0
 focus_mode = 0
 theme_override_font_sizes/font_size = 10
 text = "←"

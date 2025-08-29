@@ -1,5 +1,5 @@
 use godot::prelude::*;
-use super::*;
+use super::{item::ItemResource, *};
 
 #[derive(GodotClass)]
 #[class(no_init, base=RefCounted)]
@@ -94,10 +94,40 @@ impl PlayerContainer {
     }
 
     #[func]
+    fn get_gold(&self) -> i32 {
+        self.data.gold
+    }
+
+    #[func]
+    fn change_gold(&mut self, delta: i32) {
+        self.data.gold += delta;
+    }
+
+    #[func]
+    fn set_gold(&mut self, gold: i32) {
+        self.data.gold = gold;
+    }
+
+    #[func]
     fn is_null(&self) -> bool {
         self.data.is_null()
     }
 
+    #[func]
+    fn get_equipped_item(&self) -> Option<Gd<ItemResource>> {
+        self.data.equipped_item.as_ref().map(|i| i.to_resource())
+    }
+
+    #[func]
+    fn get_items(&self) -> Array<Option<Gd<ItemResource>>> {
+        let mut array = Array::new();
+        for item in &self.data.items {
+            array.push(
+                &item.as_ref().map(|i| i.to_resource())
+            );
+        }
+        array
+    }
 
     #[func]
     fn get_stat(&self, stat: String) -> i32 {

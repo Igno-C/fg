@@ -152,6 +152,17 @@ impl<I: Eq, T> SpatialHash<I, T> {
         }
         return None;
     }
+
+    // pub fn get_by_data<F: Fn(&T) -> bool>(&self, pos: (i32, i32), predicate: F) -> Option<&(I, T)> {
+    //     if let Some(i) = self.smallpos_to_index(self.get_smallpos(pos)) {
+    //         for object in &self.map[i] {
+    //             if predicate(&object.1) {
+    //                 return Some(object)
+    //             }
+    //         }
+    //     }
+    //     return None;
+    // }
 }
 
 impl MoveDelta {

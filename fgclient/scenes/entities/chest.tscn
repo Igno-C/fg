@@ -1,0 +1,9 @@
+[gd_scene load_steps=3 format=3 uid="uid://db6cjmy5pbj5l"]
+
+[ext_resource type="Texture2D" uid="uid://cnoepaq4ejwnu" path="res://graphics/entities/chest.png" id="1_aqcxu"]
+[ext_resource type="Script" uid="uid://bl7h42mm14t6f" path="res://scripts/entities/chest.gd" id="1_rhrmy"]
+
+[node name="Chest" type="Sprite2D"]
+texture = ExtResource("1_aqcxu")
+centered = false
+script = ExtResource("1_rhrmy")

@@ -1,6 +1,6 @@
 extends Node
 
-#@onready var debug_label: Label = get_node("Ui/DebugLabel")
+@onready var debug_label: Label = get_node("DebugLabel")
 @onready var ticker: Timer = get_node("/root/Ticker")
 @onready var game_node: Node2D = get_node("Game")
 @onready var ui_node: CanvasLayer = get_node("Ui")
@@ -34,13 +34,19 @@ func _on_login_success(pid: int, ip: String, port: int, token: String) -> void:
 	ServerNode.connect_to_server(ip, port, token)
 	your_pid = pid
 
+# Setting up the nodes for actual gameplay happens here
 func _on_connection_success() -> void:
 	var manager := GameManager.new()
 	manager.player_pid = your_pid
 	manager.name = "GameManager"
+	manager.set_debug_label.connect(set_debug_label)
 	
 	var game_menu_scene: PackedScene = load("res://scenes/menu/game/GameMenu.tscn")
-	var game_menu: Control = game_menu_scene.instantiate()
+	var game_menu: GameMenu = game_menu_scene.instantiate()
+	game_menu.name = "GameMenu"
+	
+	manager.your_data_updated.connect(game_menu.update_inventory)
+	manager.set_context_menu.connect(game_menu.set_context_menu)
 	
 	game_node.add_child(manager)
 	ui_node.add_child(game_menu)
@@ -57,4 +63,6 @@ func on_tick() -> void:
 	pass
 
 func set_debug_label(text: String) -> void:
-	print(text)
+	if text.is_empty():
+		return
+	debug_label.text = text

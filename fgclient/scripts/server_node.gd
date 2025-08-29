@@ -1,4 +1,3 @@
-#class_name Server
 extends Node
 
 const FAKELAG_ENABLED: bool = false
@@ -11,7 +10,7 @@ signal player_update(x: int, y: int, speed: int, data_version: int, pid: int)
 signal entity_update(x: int, y: int, speed: int, data_version: int, entity_id: int)
 signal generic_response(event: GenericResponse)
 signal data_update(data: PlayerContainer, pid: int)
-signal edata_update(data: Dictionary, entity_id: int)
+signal edata_update(interactable: bool, walkable: bool, related_scene: String, data: Dictionary, entity_id: int)
 signal got_chat(from: String, text: String, is_dm: bool)
 
 signal connection_success
@@ -115,8 +114,8 @@ func pchat(from: String, text: String, is_dm: bool) -> void:
 func emove(x: int, y: int, speed: int, data_version: int, entity_id: int) -> void:
 	entity_update.emit(x, y, speed, data_version, entity_id)
 
-func edata(data: Dictionary, entity_id: int) -> void:
-	edata_update.emit(data, entity_id)
+func edata(interactable: bool, walkable: bool, related_scene: String, data: Dictionary, entity_id: int) -> void:
+	edata_update.emit(interactable, walkable, related_scene, data, entity_id)
 
 # Networking configs for the RPCs
 const pmove_config: Dictionary = {

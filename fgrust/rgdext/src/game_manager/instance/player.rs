@@ -1,30 +1,22 @@
-// use godot::prelude::*;
-
 use std::{cell::RefCell, rc::Rc};
 
 use rgdext_shared::playerdata::PlayerData;
 
 
-// #[derive(GodotClass)]
-// #[class(base=Node)]
 pub struct Player {
     pub ticks_since_move: i32,
+    pub data_just_updated: bool,
+    pub private_data_just_updated: bool,
     speed: i32,
     // These two essentially make a 2-move buffer
     nextmove: Option<(i32, i32, i32)>,
     nextnextmove: Option<(i32, i32, i32)>,
 
-    data: PlayerData,
+    pub data: PlayerData,
     /// Counter that increments every time the non-positional data is edited
     /// 
     /// Used by clients to know whether they have the most up to date player data
     data_version: i32,
-    // pub location: String,
-    // Flag that signals that players should be sent updated player data
-    // pub data_just_updated: bool,
-
-    // Ugly flag just used to update players on their positions once
-    // pub just_spawned: bool,
 }
 
 impl Player {
@@ -69,18 +61,21 @@ impl Player {
 
     pub fn y(&self) -> i32 {self.data.y}
 
-    pub fn speed(&self) -> i32 {self.speed}
+    // pub fn speed(&self) -> i32 {self.speed}
 
     pub fn pid(&self) -> i32 {self.data.pid}
 
     pub fn data_version(&self) -> i32 {self.data_version}
 
-    pub fn data(&self) -> &PlayerData {&self.data}
+    // pub fn data(&self) -> &PlayerData {&self.data}
 
-    /// Increments data_version, so you better change something
-    pub fn data_mut(&mut self) -> &mut PlayerData {
+    pub fn set_public_change(&mut self) {
         self.data_version += 1;
-        &mut self.data
+        self.data_just_updated = true;
+    }
+
+    pub fn set_private_change(&mut self) {
+        self.private_data_just_updated = true;
     }
 
     pub fn into_data(self) -> PlayerData {
@@ -98,47 +93,13 @@ impl Player {
     
                 data,
                 data_version: 0,
+                data_just_updated: false,
+                private_data_just_updated: false,
             }
         ))
     }
-
-    /// Has data_just_updated = true and just_spawned = true
-    // pub fn new(data: Rc<RefCell<PlayerData>>) -> Self {
-    //     // data.borrow_mut().location = location.to_string();
-    //     // let startx = 0;
-    //     // let starty = 0;
-    //     Self {
-    //         ticks_since_move: 0,
-    //         speed: 0,
-    //         nextmove: None,
-    //         nextnextmove: None,
-    //         // location: location.to_string(),
-
-    //         data,
-    //         data_version: 0,
-
-    //         // just_spawned: true,
-    //     }
-    // }
 
     pub fn set_location(&mut self, location: impl ToString) {
         self.data.location = location.to_string();
     }
 }
-
-// pub struct PeekMove<'a>(&'a mut Option<(i32, i32, i32)>, &'a mut Option<(i32, i32, i32)>);
-
-// impl<'a> PeekMove<'a> {
-//     pub fn eat(&mut self) {
-//         *self.0 = self.1.take();
-//         // *self.1 = None;
-//     }
-// }
-
-// impl<'a> std::ops::Deref for PeekMove<'a> {
-//     type Target = Option<(i32, i32, i32)>;
-
-//     fn deref(&self) -> &Self::Target {
-//         self.0
-//     }
-// }

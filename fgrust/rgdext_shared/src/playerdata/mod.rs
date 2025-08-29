@@ -1,10 +1,14 @@
 use bitcode::{Decode, Encode};
 use godot::prelude::*;
+use item::Item;
 
 pub mod item;
 pub mod skills;
 pub mod playercontainer;
 
+
+/// Corresponding to an 5x8 grid on the client
+pub const MAX_ITEMS: usize = 40;
 
 #[derive(Clone, Encode, Decode, Debug)]
 pub struct PlayerData {
@@ -18,7 +22,9 @@ pub struct PlayerData {
 
     pub skills: skills::Skills,
     pub skill_progress: skills::SkillProgress,
-    pub items: Vec<item::Item>,
+    pub gold: i32,
+    pub equipped_item: Option<Item>,
+    pub items: [Option<Item>; MAX_ITEMS],
 }
 
 impl PlayerData {
@@ -49,7 +55,9 @@ impl PlayerData {
 
             skills: skills::Skills::default(),
             skill_progress: skills::SkillProgress::default(),
-            items: Vec::new(),
+            gold: 0,
+            equipped_item: None,
+            items: [const {None}; MAX_ITEMS],
         }
     }
 
@@ -57,7 +65,33 @@ impl PlayerData {
         return self.location.is_empty();
     }
 
-    /// Clones name and location
+    pub fn get_item(&self, index: usize) -> Option<&Item> {
+        match &self.items.get(index) {
+            Some(i) => i.as_ref(),
+            None => None,
+        }
+    }
+
+    /// Returns true if item successfully inserted
+    pub fn insert_item(&mut self, item: Item) -> bool {
+        for item_slot in self.items.iter_mut() {
+            match item_slot {
+                Some(existing_item) => {
+                    if existing_item.stackable() && existing_item.id_string() == item.id_string() {
+                        existing_item.count += item.count;
+                        return true;
+                    }
+                },
+                None => {
+                    *item_slot = Some(item);
+                    return true;
+                },
+            }
+        }
+        return false;
+    }
+
+    /// Gets all player data except for skill progress, gold and inventory
     pub fn get_minimal(&self) -> Self {
         Self {
             name: self.name.clone(),
@@ -71,7 +105,9 @@ impl PlayerData {
 
             skills: self.skills.clone(),
             skill_progress: skills::SkillProgress::default(),
-            items: Vec::new(),
+            gold: 0,
+            equipped_item: self.equipped_item.clone(),
+            items: [const {None}; MAX_ITEMS],
         }
     }
 }
@@ -92,7 +128,9 @@ impl Default for PlayerData {
 
             skills: skills::Skills::default(),
             skill_progress: skills::SkillProgress::default(),
-            items: Vec::new(),
+            gold: 0,
+            equipped_item: None,
+            items: [const {None}; MAX_ITEMS],
         }
     }
 }

@@ -7,10 +7,10 @@ var server_name: String
 var server_load: int
 
 var load_icons: Array[Texture2D] = [
-	preload("res://graphics/menu/load1.png"),
-	preload("res://graphics/menu/load2.png"),
-	preload("res://graphics/menu/load3.png"),
-	preload("res://graphics/menu/load4.png"),
+	preload("res://graphics/menu/login/load1.png"),
+	preload("res://graphics/menu/login/load2.png"),
+	preload("res://graphics/menu/login/load3.png"),
+	preload("res://graphics/menu/login/load4.png"),
 ]
 
 signal pressed(name: String)

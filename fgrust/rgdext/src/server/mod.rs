@@ -1,4 +1,4 @@
-use godot::{classes::{multiplayer_api::RpcMode, multiplayer_peer::TransferMode, ENetMultiplayerPeer}, prelude::*};
+use godot::{classes::ENetMultiplayerPeer, prelude::*};
 use rgdext_shared::genericevent::GenericPlayerEvent;
 use crate::eventqueue::{EQueue, GameEvent, ServerEvent};
 
@@ -116,7 +116,7 @@ impl INode for Server {
                     self.base().get_multiplayer().unwrap().get_multiplayer_peer().unwrap().disconnect_peer(net_id);
                 },
                 ServerEvent::PlayerChat{from, text, is_dm, net_id} => {
-                    self.base_mut().rpc_id(net_id.into(), "pchat", vslice![from, text, net_id]);
+                    self.base_mut().rpc_id(net_id.into(), "pchat", vslice![from, text, is_dm]);
                 }
                 ServerEvent::GenericResponse{response, net_id} => {
                     // let data = response.to_bytearray();
@@ -125,8 +125,8 @@ impl INode for Server {
                 ServerEvent::EntityMoveResponse{x, y, speed, entity_id, data_version, net_id} => {
                     self.base_mut().rpc_id(net_id.into(), "emove", vslice![x, y, speed, data_version, entity_id]);
                 },
-                ServerEvent::EntityDataResponse{data, entity_id, net_id} => {
-                    self.base_mut().rpc_id(net_id.into(), "edata", vslice![data, entity_id]);
+                ServerEvent::EntityDataResponse{interactable, walkable, related_scene, data, entity_id, net_id} => {
+                    self.base_mut().rpc_id(net_id.into(), "edata", vslice![interactable, walkable, related_scene, data, entity_id]);
                 }
             }
         };

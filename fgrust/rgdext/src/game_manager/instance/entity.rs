@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use godot::prelude::*;
-use rgdext_shared::basemap::spatialhash::SpatialHash;
+use rgdext_shared::{basemap::spatialhash::SpatialHash, playerdata::item::ItemResource};
 
 /// Only overrwite on_* virtual methods.
 /// 
@@ -17,9 +17,9 @@ pub struct GenericScriptedEntity {
     /// 
     /// Interaction response is based on the [method _on_player_interaction] method.
     pub interactable: bool,
-    #[export]
-    /// If interactable, what's the max Chebyshev distance the entity can be interacted with. 0 means just the position.
-    pub interactable_distance: i32,
+    // #[export]
+    // /// If interactable, what's the max Chebyshev distance the entity can be interacted with. 0 means just the position.
+    // pub interactable_distance: i32,
     #[export]
     /// Whether the entity should trigger on being walked on.
     /// 
@@ -29,7 +29,7 @@ pub struct GenericScriptedEntity {
     /// Whether the entity has a client scene that should be shown to the clients.
     /// 
     /// Set to the name of the scene minus .tscn suffix. Leave empty to leave the entity invisible to clients.
-    pub related_scene: GString,
+    related_scene: GString,
 
     #[export]
     /// Custom entity data that gets synchronised between client and server.
@@ -38,7 +38,11 @@ pub struct GenericScriptedEntity {
     /// Change either using [method set_public_value], or by calling [method increment_data_version]
     /// to update the data version for client synchronization.
     public_data: Dictionary,
-    public_data_version: i32,
+    pub public_data_version: i32,
+    pub data_just_updated: bool,
+    pub last_speed: i32,
+    pub ticks_since_last_move: i32,
+    pub entity_id: i32,
 
     base: Base<Node>
 }
@@ -49,11 +53,15 @@ impl INode for GenericScriptedEntity {
         Self {
             pos: Vector2i::ZERO,
             interactable: false,
-            interactable_distance: 0,
+            // interactable_distance: 0,
             walkable: false,
             related_scene: "".to_godot(),
             public_data: Dictionary::new(),
             public_data_version: 0,
+            data_just_updated: false,
+            last_speed: 0,
+            ticks_since_last_move: 0,
+            entity_id: -1,
             
             base
         }
@@ -79,30 +87,33 @@ impl GenericScriptedEntity {
     #[func]
     fn set_public_value(&mut self, key: Variant, value: Variant) {
         self.public_data_version += 1;
+        self.data_just_updated = true;
         self.public_data.set(key, value);
     }
 
     #[func]
     fn increment_data_version(&mut self) {
         self.public_data_version += 1;
+        self.data_just_updated = true;
     }
 
     #[func(gd_self, virtual)]
-    pub fn on_player_walk(slf: Gd<Self>, net_id: i32) -> Gd<ScriptResponse> {
+    pub fn on_player_walk(this: Gd<Self>, net_id: i32) -> Gd<ScriptResponse> {
         ScriptResponse::null_response()
     }
 
     #[func(gd_self, virtual)]
-    pub fn on_player_interaction(slf: Gd<Self>, net_id: i32) -> Gd<ScriptResponse> {
+    pub fn on_player_interaction(this: Gd<Self>, with_item: Option<Gd<ItemResource>>, net_id: i32) -> Gd<ScriptResponse> {
         ScriptResponse::null_response()
     }
 
-    pub fn get_data(&self) -> Dictionary {
-        self.public_data.clone()
+    #[func]
+    fn ticks_since_last_move(&self) -> i32 {
+        self.ticks_since_last_move
     }
 
-    pub fn get_data_version(&self) -> i32 {
-        self.public_data_version
+    pub fn get_data(&self) -> (bool, bool, GString, Dictionary) {
+        (self.interactable, self.walkable, self.related_scene.clone(), self.public_data.clone())
     }
 }
 
@@ -131,6 +142,41 @@ impl ScriptResponse {
     }
 
     #[func]
+    fn move_self(x: i32, y: i32, speed: i32) -> Gd<ScriptResponse> {
+        let response = ResponseType::MoveSelf{x, y, speed};
+        
+        Gd::from_init_fn(|base| ScriptResponse {response, base})
+    }
+
+    #[func]
+    fn give_item(item: Gd<ItemResource>, net_id: i32) -> Gd<ScriptResponse> {
+        let response = ResponseType::GiveItem{item, net_id};
+        
+        Gd::from_init_fn(|base| ScriptResponse {response, base})
+    }
+
+    #[func]
+    fn despawn_self() -> Gd<ScriptResponse> {
+        let response = ResponseType::DespawnSelf{};
+        
+        Gd::from_init_fn(|base| ScriptResponse {response, base})
+    }
+
+    #[func]
+    fn register_entity(entity: Gd<GenericScriptedEntity>) -> Gd<ScriptResponse> {
+        let response = ResponseType::RegisterEntity{entity};
+        
+        Gd::from_init_fn(|base| ScriptResponse {response, base})
+    }
+
+    #[func]
+    fn chat_message(text: GString, net_id: i32) -> Gd<ScriptResponse> {
+        let response = ResponseType::SystemChatMessage{text, net_id};
+        
+        Gd::from_init_fn(|base| ScriptResponse {response, base})
+    }
+
+    #[func]
     fn null_response() -> Gd<ScriptResponse> {
         Gd::from_init_fn(|base| ScriptResponse {response: ResponseType::Null, base})
     }
@@ -142,6 +188,10 @@ pub enum ResponseType {
     MovePlayerToMap{mapname: GString, x: i32, y: i32, net_id: i32},
     MovePlayer{x: i32, y: i32, speed: i32, net_id: i32},
     MoveSelf{x: i32, y: i32, speed: i32},
+    GiveItem{item: Gd<ItemResource>, net_id: i32},
+    DespawnSelf{},
+    RegisterEntity{entity: Gd<GenericScriptedEntity>},
+    SystemChatMessage{text: GString, net_id: i32},
     Null
 }
 
@@ -162,10 +212,15 @@ pub struct Entities {
 
     interactables: HashMap<(i32, i32), Gd<GenericScriptedEntity>>,
     walkables: HashMap<(i32, i32), Gd<GenericScriptedEntity>>,
-    visibles: SpatialHash<i32, Gd<GenericScriptedEntity>>,
+    visible_hash: SpatialHash<i32, Gd<GenericScriptedEntity>>,
+    visibles: Vec<Gd<GenericScriptedEntity>>
 }
 
 impl Entities {
+    pub fn set_spatial_hash(&mut self, hash: SpatialHash<i32, Gd<GenericScriptedEntity>>) {
+        self.visible_hash = hash;
+    }
+
     pub fn get_interactable_at(&mut self, x: i32, y: i32) -> Option<&mut Gd<GenericScriptedEntity>> {
         return self.interactables.get_mut(&(x, y));
     }
@@ -175,10 +230,33 @@ impl Entities {
     }
 
     pub fn get_visible_hash(&self) -> &SpatialHash<i32, Gd<GenericScriptedEntity>> {
-        &self.visibles
+        &self.visible_hash
     }
 
-    pub fn register_interactable(&mut self, entity: Gd<GenericScriptedEntity>) {
+    pub fn get_visible_hash_mut(&mut self) -> &mut SpatialHash<i32, Gd<GenericScriptedEntity>> {
+        &mut self.visible_hash
+    }
+
+    pub fn register_entity(&mut self, entity: Gd<GenericScriptedEntity>) {
+        if entity.bind().interactable {
+            // godot_print!("Registering interactable");
+            self.register_interactable(entity.clone());
+        }
+        if entity.bind().walkable {
+            // godot_print!("Registering walkable");
+            self.register_walkable(entity.clone());
+        }
+        if !entity.bind().related_scene.is_empty() {
+            // godot_print!("Registering visible");
+            self.register_visible(entity);
+        }
+    }
+
+    pub fn iter_visibles_mut(&mut self) -> impl Iterator<Item = &mut Gd<GenericScriptedEntity>> {
+        self.visibles.iter_mut()
+    }
+
+    fn register_interactable(&mut self, entity: Gd<GenericScriptedEntity>) {
         let e = entity.bind();
         let x = e.pos.x; let y = e.pos.y;
         std::mem::drop(e);
@@ -186,7 +264,7 @@ impl Entities {
         self.interactables.insert((x, y), entity);
     }
 
-    pub fn register_walkable(&mut self, entity: Gd<GenericScriptedEntity>) {
+    fn register_walkable(&mut self, entity: Gd<GenericScriptedEntity>) {
         let e = entity.bind();
         let x = e.pos.x; let y = e.pos.y;
         std::mem::drop(e);
@@ -194,12 +272,14 @@ impl Entities {
         self.walkables.insert((x, y), entity);
     }
 
-    pub fn register_visible(&mut self, entity: Gd<GenericScriptedEntity>) {
+    fn register_visible(&mut self, mut entity: Gd<GenericScriptedEntity>) {
         let e = entity.bind();
         let x = e.pos.x; let y = e.pos.y;
         std::mem::drop(e);
 
         self.last_id += 1;
-        self.visibles.insert(self.last_id, entity, (x, y));
+        entity.bind_mut().entity_id = self.last_id;
+        self.visibles.push(entity.clone());
+        self.visible_hash.insert(self.last_id, entity, (x, y));
     }
 }

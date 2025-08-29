@@ -44,13 +44,16 @@ func open_chat() -> void:
 
 func push_chat_message(from: String, text: String, is_dm: bool) -> void:
 	# Prevents showing newlines, escapes BBCode injection
-	from = from.strip_edges().replace("\n", " ").replace("[", "[lb]")
-	text = text.strip_edges().replace("\n", " ").replace("[", "[lb]")
 	var message: String
-	if is_dm:
-		message = "\n[color=#6996FF][b][%s]: [/b]%s[/color]" % [from, text]
+	if from.is_empty():
+		message = "\n" + text
 	else:
-		message = "\n[b]<%s>: [/b] %s" % [from, text]
+		from = from.strip_edges().replace("\n", " ").replace("[", "[lb]")
+		text = text.strip_edges().replace("\n", " ").replace("[", "[lb]")
+		if is_dm:
+			message = "\n[color=#6996FF][b][%s]: [/b]%s[/color]" % [from, text]
+		else:
+			message = "\n[b]<%s>: [/b] %s" % [from, text]
 	chat.text += message
 	if chat.get_line_count() > MAX_CHAT_MESSAGES:
 		chat.text = trim_first_line(chat.text)
@@ -72,6 +75,10 @@ func _on_hide_pressed() -> void:
 
 func _on_chat_send(text: String) -> void:
 	line_edit.text = ""
+	line_edit.release_focus()
+	text = text.strip_edges()
+	if text.is_empty():
+		return
 	if dm_target == -1:
 		ServerNode.send_zone_chat(text)
 	else:

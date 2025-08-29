@@ -113,8 +113,8 @@ impl INode for GameManager {
                 GameEvent::PlayerJoined{net_id, pid} => self.player_joined(net_id, pid),
                 GameEvent::PlayerDisconnected{net_id} => self.player_despawn(net_id),
                 GameEvent::PlayerJoinInstance{mapname, x, y, net_id} => self.player_join_instance(&mapname, x, y, net_id),
-                GameEvent::PlayerChat{text, target_pid, net_id} => {self.broadcast_chat(text, target_pid, net_id)},
-                GameEvent::PlayerDm{from, text, target_pid} => {self.signals().relay_dm().emit(&from, &text, target_pid);},
+                GameEvent::PlayerChat{text, target_pid, net_id} => self.broadcast_chat(text, target_pid, net_id),
+                GameEvent::PlayerDm{from, text, target_pid} => self.signals().relay_dm().emit(&from, &text, target_pid),
                 GameEvent::GenericEvent{event, net_id} => self.handle_generic_event(event, net_id),
                 GameEvent::PDataRequest{pid, net_id} => self.player_retrieve_data(pid, net_id),
                 GameEvent::EDataRequest{x, y, entity_id, net_id} => self.player_retrieve_edata(x, y, entity_id, net_id),
@@ -159,7 +159,7 @@ impl GameManager {
         
         for (pid, dataentry) in std::mem::take(&mut self.player_datas).into_iter() {
             if let PlayerDataEntry::ActivePlayer{player, net_id, age: _} = dataentry {
-                let bytearray = player.borrow().data().to_bytearray();
+                let bytearray = player.borrow().data.to_bytearray();
 
                 self.signals().save().emit(pid, &bytearray, true);
                 self.equeue.push_server(ServerEvent::PlayerForceDisconnect{net_id});
@@ -232,7 +232,7 @@ impl GameManager {
     fn save_dataentry(&mut self, pid: i32) {
         if let Some(dataentry) = self.player_datas.get(&pid) {
             if let PlayerDataEntry::ActivePlayer{player, net_id: _, age: _} = dataentry {
-                let data = player.borrow().data().to_bytearray();
+                let data = player.borrow().data.to_bytearray();
                 self.signals().save().emit(pid, &data, false);
             }
         }
@@ -244,9 +244,9 @@ impl GameManager {
     // Eats the player rc, resets server_name, saves with unlock
     fn save_unlocking(&mut self, player: Rc<RefCell<Player>>) {
         let mut b = player.borrow_mut();
-        b.data_mut().server_name.clear();
+        b.data.server_name.clear();
         let pid = b.pid();
-        self.signals().save().emit(pid, &b.data().to_bytearray(), true);
+        self.signals().save().emit(pid, &b.data.to_bytearray(), true);
         drop(b); drop(player);
     }
 
@@ -254,7 +254,7 @@ impl GameManager {
         if let Some(pdataentry) = self.player_datas.get(&pid) {
             let data = match pdataentry {
                 PlayerDataEntry::RawData{data, age: _} => data.to_bytearray(),
-                PlayerDataEntry::ActivePlayer{player, net_id: _, age: _} => player.borrow().data().to_bytearray(),
+                PlayerDataEntry::ActivePlayer{player, net_id: _, age: _} => player.borrow().data.to_bytearray(),
             };
             self.equeue.push_server(ServerEvent::PlayerDataResponse{data, net_id});
         }
@@ -373,19 +373,26 @@ impl GameManager {
     }
 
     fn handle_generic_event(&mut self, event: GenericPlayerEvent, net_id: i32) {
-        match event {
-            GenericPlayerEvent::Interaction{x, y} => {
-                if let Some(instance) = self.player_locations.get_mut(&net_id) {
-                    instance.bind_mut().handle_interaction(x, y, net_id);
-                }
-            },
-            GenericPlayerEvent::Err => {},
+        if let Some(instance) = self.player_locations.get_mut(&net_id) {
+            instance.bind_mut().handle_generic_event(event, net_id);
         }
     }
 
     fn broadcast_chat(&mut self, text: GString, target_pid: i32, net_id: i32) {
-        if let Some(instance) = self.player_locations.get_mut(&net_id) {
-            instance.bind_mut().broadcast_chat(text, target_pid, net_id);
-        }
+        // Just regular broadcast then
+        // if target_pid == -1 {
+            if let Some(instance) = self.player_locations.get_mut(&net_id) {
+                instance.bind_mut().broadcast_chat(text, target_pid, net_id);
+            }
+        // }
+        // else {
+        //     if let Some(target_dataentry) = self.player_datas.get(&target_pid) {
+        //         if let PlayerDataEntry::ActivePlayer{player: _, net_id: target_net_id, age: _} = target_dataentry {
+        //             if let Some(instance) = self.player_locations.get_mut(&net_id) {
+        //                 instance.bind_mut().broadcast_dm(text, target_pid, a);
+        //             }
+        //         }
+        //     }
+        // }
     }
 }

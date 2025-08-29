@@ -5,9 +5,10 @@ use rgdext_shared::playerdata::PlayerData;
 use super::instance::player::Player;
 
 
-
+/// After how many seconds does an inactive player's data get removed
 const PLAYER_DATA_TIMEOUT: f64 = 60.;
-const PLAYER_SAVE_TIMEOUT: f64 = 60.;
+/// Every how many seconds does the player data get saved to the database
+const PLAYER_SAVE_TIMEOUT: f64 = 90.;
 
 pub enum PlayerDataEntry {
     RawData{data: PlayerData, age: f64},

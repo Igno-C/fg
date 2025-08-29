@@ -21,6 +21,7 @@ var pis = PlayerInputState.new()
 
 signal send_move(x: int, y: int, speed: int)
 signal send_event(event: GenericEvent)
+signal open_context_at(pos: Vector2i)
 signal set_debug_label(text: String)
 
 func _process(_delta:) -> void:
@@ -51,16 +52,21 @@ func get_mouse_ipos() -> Vector2i:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_LEFT:
-			var ipos := get_mouse_ipos()
-			target = ipos
-			go_to_target = true
-		elif event.button_index == MOUSE_BUTTON_RIGHT:
-			var ipos := get_mouse_ipos()
-			print(ipos)
-			send_event.emit(GenericEvent.interaction(ipos.x, ipos.y))
+		if event.pressed:
+			if event.button_index == MOUSE_BUTTON_LEFT:
+				var ipos := get_mouse_ipos()
+				target = ipos
+				go_to_target = true
+			elif event.button_index == MOUSE_BUTTON_RIGHT:
+				var ipos := get_mouse_ipos()
+				open_context_at.emit(ipos)
+				print(ipos)
 	else:
 		pis.take_event(event)
+
+func go_to_pos(pos: Vector2i) -> void:
+	target = pos
+	go_to_target = true
 
 func set_player(p: PlayerEntity) -> void:
 	player = p

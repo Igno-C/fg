@@ -1,14 +1,17 @@
-[gd_scene load_steps=3 format=3 uid="uid://cguywwbwlykh2"]
+[gd_scene load_steps=6 format=3 uid="uid://cguywwbwlykh2"]
 
-[ext_resource type="Script" uid="uid://b3ulfsqahp2ls" path="res://entities/generic_instance_portal.gd" id="1_v8mf2"]
-[ext_resource type="Script" uid="uid://bnlpapopcb6wh" path="res://entities/generic_portal_entity.gd" id="2_rj0bn"]
+[ext_resource type="Script" uid="uid://b3ulfsqahp2ls" path="res://entities/generic_instance_portal.gd" id="1_rn5oq"]
+[ext_resource type="Script" uid="uid://bnlpapopcb6wh" path="res://entities/generic_portal_entity.gd" id="2_gc36p"]
+[ext_resource type="Script" uid="uid://c7bflugjvo4uh" path="res://entities/generic_tree.gd" id="3_frp5n"]
+[ext_resource type="Script" uid="uid://diyx86gwwrml7" path="res://entities/generic_cooldownchest.gd" id="4_yj6n1"]
+[ext_resource type="ItemResource" uid="uid://ch3mj0fe4w0oq" path="res://items/axe.tres" id="5_pkcb3"]
 
 [node name="Entities" type="Node"]
 
 [node name="map1portal" type="GenericScriptedEntity" parent="."]
 pos = Vector2i(8, 0)
 walkable = true
-script = ExtResource("1_v8mf2")
+script = ExtResource("1_rn5oq")
 mapname = "map1"
 to_where = Vector2i(4, -3)
 metadata/_custom_type_script = "uid://b3ulfsqahp2ls"
@@ -16,13 +19,28 @@ metadata/_custom_type_script = "uid://b3ulfsqahp2ls"
 [node name="leftportal" type="GenericScriptedEntity" parent="."]
 pos = Vector2i(6, -29)
 walkable = true
-script = ExtResource("2_rj0bn")
+script = ExtResource("2_gc36p")
 to_where = Vector2i(14, -29)
 metadata/_custom_type_script = "uid://bnlpapopcb6wh"
 
 [node name="rightportal" type="GenericScriptedEntity" parent="."]
 pos = Vector2i(13, -29)
 walkable = true
-script = ExtResource("2_rj0bn")
+script = ExtResource("2_gc36p")
 to_where = Vector2i(5, -29)
 metadata/_custom_type_script = "uid://bnlpapopcb6wh"
+
+[node name="thetree" type="GenericScriptedEntity" parent="."]
+pos = Vector2i(-3, -30)
+interactable = true
+related_scene = "tree"
+script = ExtResource("3_frp5n")
+metadata/_custom_type_script = "uid://c7bflugjvo4uh"
+
+[node name="axechest" type="GenericScriptedEntity" parent="."]
+pos = Vector2i(18, -29)
+interactable = true
+script = ExtResource("4_yj6n1")
+cooldown = 10.0
+loot = ExtResource("5_pkcb3")
+metadata/_custom_type_script = "uid://diyx86gwwrml7"

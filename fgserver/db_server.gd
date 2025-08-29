@@ -33,7 +33,7 @@ func _save(pid: int) -> void:
 
 @rpc("any_peer", "call_remote", "reliable", 0)
 func _retrieve(pid: int, data: PackedByteArray) -> void:
-	print("Retrieved data from db for pid ", pid, ": ", data)
+	print("Retrieved data from db for pid ", pid)
 	retrieved.emit(pid, data)
 
 @rpc("any_peer", "call_remote", "reliable", 1)

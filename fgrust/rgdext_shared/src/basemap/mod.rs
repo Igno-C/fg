@@ -4,23 +4,17 @@ use bitcode::{Encode, Decode};
 pub mod spatialhash;
 
 #[derive(GodotClass)]
-#[class(tool, base=Node)]
+#[class(tool, base=Node2D)]
 pub struct BaseMap {
-    /// Impacts how entities load
-    // on_server: bool,
-
     col_array: CollisionArray,
     
-    base: Base<Node>
+    base: Base<Node2D>
 }
 
 #[godot_api]
-impl INode for BaseMap {
-    fn init(base: Base<Node>) -> Self {
+impl INode2D for BaseMap {
+    fn init(base: Base<Node2D>) -> Self {
         Self {
-            // drop_graphics: false,
-            // on_server: false,
-
             col_array: CollisionArray::new(),
             
             base
@@ -31,6 +25,7 @@ impl INode for BaseMap {
     fn ready(&mut self) {
         if !godot::classes::Engine::singleton().is_editor_hint() {
             self.col_array = self.extract_collisions(true);
+            self.base_mut().set_z_index(-1);
         }
     }
 }
