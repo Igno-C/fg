@@ -3,13 +3,14 @@ extends Panel
 
 @onready var vbox: VBoxContainer = get_node("VBox")
 
-signal inspect_player(data: PlayerContainer)
+signal inspect_player(data: PlayerContainer, show_invite_btn: bool)
 signal interact_with_entity(entity_id: int)
 signal walk_to_pos(pos: Vector2i)
 
 var related_pos: Vector2i
 var players: Array[PlayerEntity]
 var entities: Array[GenericEntity]
+var player_pid: int
 
 func _ready() -> void:
 	position = get_global_mouse_position()
@@ -30,7 +31,9 @@ func add_inspect_option(data: PlayerContainer) -> void:
 	var interact_string := "Inspect player \"%s\"" % data.get_name()
 	var new_button = Button.new()
 	new_button.text = interact_string
-	new_button.pressed.connect(inspect_player.emit.bind(data))
+	
+	var show_invite_btn := data.get_pid() != player_pid
+	new_button.pressed.connect(inspect_player.emit.bind(data, show_invite_btn))
 	new_button.pressed.connect(self.queue_free)
 	vbox.add_child(new_button)
 

@@ -3,6 +3,7 @@ use bitcode::{Decode, Encode};
 
 
 // #[derive(Decode, Encode)]
+#[derive(Clone, Copy)]
 #[repr(usize)]
 pub enum Skill {
     Woodcutting,
@@ -13,9 +14,10 @@ pub enum Skill {
     Strength,
     Agility,
     Endurance,
-    Magic
+    Magic,
+    Ranged
 }
-const NUM_SKILLS: usize = 9;
+const NUM_SKILLS: usize = 10;
 
 impl Skill {
     pub fn try_from_str(s: &str) -> Option<Skill> {
@@ -29,12 +31,28 @@ impl Skill {
             "agility" => Some(Skill::Agility),
             "endurance" => Some(Skill::Endurance),
             "magic" => Some(Skill::Magic),
+            "ranged" => Some(Skill::Ranged),
             _ => None,
         }
     }
+
+    pub fn skill_strs() -> [&'static str; NUM_SKILLS] {
+        [
+            "woodcutting",
+            "mining",
+            "smelting",
+            "crafting",
+            "farming",
+            "strength",
+            "agility",
+            "endurance",
+            "magic",
+            "ranged",
+        ]
+    }
 }
 
-#[derive(Clone, Default, Encode, Decode, Debug)]
+#[derive(Clone, Encode, Decode, Debug)]
 pub struct Skills {
     skills: [u8; NUM_SKILLS],
 }
@@ -50,6 +68,12 @@ impl std::ops::Index<Skill> for Skills {
 impl std::ops::IndexMut<Skill> for Skills {
     fn index_mut(&mut self, index: Skill) -> &mut u8 {
         &mut self.skills[index as usize]
+    }
+}
+
+impl Default for Skills {
+    fn default() -> Self {
+        Self{skills: [1; NUM_SKILLS]}
     }
 }
 

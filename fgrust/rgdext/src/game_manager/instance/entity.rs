@@ -217,6 +217,15 @@ pub struct Entities {
 }
 
 impl Entities {
+    pub fn remove_entity(&mut self, pos: (i32, i32), entity_id: i32) {
+        self.interactables.remove(&pos);
+        self.walkables.remove(&pos);
+        self.visible_hash.remove(entity_id, pos);
+        if let Some(index) = self.visibles.iter().position(|v| v.bind().entity_id == entity_id) {
+            self.visibles.remove(index);
+        }
+    }
+
     pub fn set_spatial_hash(&mut self, hash: SpatialHash<i32, Gd<GenericScriptedEntity>>) {
         self.visible_hash = hash;
     }

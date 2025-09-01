@@ -6,16 +6,13 @@ use super::instance::player::Player;
 
 
 /// After how many seconds does an inactive player's data get removed
-const PLAYER_DATA_TIMEOUT: f64 = 60.;
+const PLAYER_DATA_TIMEOUT: f64 = 45.;
 /// Every how many seconds does the player data get saved to the database
 const PLAYER_SAVE_TIMEOUT: f64 = 90.;
 
 pub enum PlayerDataEntry {
     RawData{data: PlayerData, age: f64},
     ActivePlayer{player: Rc<RefCell<Player>>, net_id: i32, age: f64}
-    // pub data: Rc<RefCell<PlayerData>>,
-    // age: f64,
-    // net_id: Option<i32>,
 }
 
 impl PlayerDataEntry {
@@ -51,6 +48,14 @@ impl PlayerDataEntry {
         match self {
             PlayerDataEntry::ActivePlayer{player: _, net_id: _, age: _} => true,
             _ => false,
+        }
+    }
+
+    /// Returns none if player not online on this server
+    pub fn get_net_id(&self) -> Option<i32> {
+        match self {
+            PlayerDataEntry::RawData{data: _, age: _} => None,
+            PlayerDataEntry::ActivePlayer{player: _, net_id, age: _} => Some(*net_id),
         }
     }
 }

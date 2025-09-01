@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::{BTreeMap, HashMap}, rc::Rc, sync::{atomic::{AtomicBool, Ordering}, Arc}};
 
 use godot::prelude::*;
-use rgdext_shared::{genericevent::GenericPlayerEvent, playerdata::PlayerData};
+use rgdext_shared::{genericevent::{GenericPlayerEvent, GenericServerResponse}, playerdata::PlayerData};
 
 use crate::eventqueue::{EQueue, GameEvent, ServerEvent};
 use instance::{player::Player, Instance};
@@ -9,6 +9,8 @@ use misc::*;
 
 mod instance;
 mod misc;
+
+const FRIEND_REQUEST_TIMEOUT: f64 = 120.;
 
 #[derive(GodotClass)]
 #[class(base=Node)]
@@ -31,6 +33,8 @@ pub struct GameManager {
     datagets: BTreeMap<i32, Vec<i32>>,
     /// pid -> net_id
     full_datagets: BTreeMap<i32, i32>,
+    /// (inviter pid, invitee pid) -> timeout timer
+    friend_invites: BTreeMap<(i32, i32), f64>,
 
     /// Set to true on getting SIGINT
     got_sigint: Arc<AtomicBool>,
@@ -51,6 +55,7 @@ impl INode for GameManager {
 
             datagets: BTreeMap::new(),
             full_datagets: BTreeMap::new(),
+            friend_invites: BTreeMap::new(),
 
             got_sigint: Arc::new(AtomicBool::new(false)),
 
@@ -88,7 +93,8 @@ impl INode for GameManager {
             self.full_save();
         }
 
-        let mut saves = Vec::with_capacity(10);
+        // Ticking and timeouting or saving player data
+        let mut saves = Vec::new();
         self.player_datas.retain(|pid, pdata| {
             match pdata.tick(delta) {
                 DataTickResult::Idle => true,
@@ -106,6 +112,12 @@ impl INode for GameManager {
         for pid_to_save in saves {
             self.save_dataentry(pid_to_save);
         }
+
+        // Ticking and timeouting friend invites
+        self.friend_invites.retain(|_pids, time| {
+            *time += delta;
+            *time < FRIEND_REQUEST_TIMEOUT
+        });
 
         for e in self.equeue.iter_game() {
             match e {
@@ -148,7 +160,7 @@ impl GameManager {
         self.save_dataentry(pid);
     }
 
-    /// Does unlocking saves for all playerdatas, consuming them, then disables process for itself and all instances
+    /// Does unlocking saves for all playerdatas, consuming them, then disables process for itself and queue frees all instances
     fn full_save(&mut self) {
         self.player_locations.clear();
         for instances in std::mem::take(&mut self.instances).into_values() {
@@ -157,11 +169,12 @@ impl GameManager {
             }
         }
         
-        for (pid, dataentry) in std::mem::take(&mut self.player_datas).into_iter() {
+        for dataentry in std::mem::take(&mut self.player_datas).into_values() {
             if let PlayerDataEntry::ActivePlayer{player, net_id, age: _} = dataentry {
-                let bytearray = player.borrow().data.to_bytearray();
+                self.save_unlocking(player);
+                // let bytearray = player.borrow().data.to_bytearray();
 
-                self.signals().save().emit(pid, &bytearray, true);
+                // self.signals().save().emit(pid, &bytearray, true);
                 self.equeue.push_server(ServerEvent::PlayerForceDisconnect{net_id});
             }
         }
@@ -187,11 +200,12 @@ impl GameManager {
 
         // This is where the player truly joins the server and the Player object is created
         let new_entry = if let Some(net_id) = self.full_datagets.remove(&pid) {
-            if let Ok(data) = data {
-                self.equeue.push_server(ServerEvent::PlayerDataResponse{data: data.to_bytearray(), net_id: net_id});
+            if let Ok(mut data) = data {
+                self.equeue.push_server(ServerEvent::PlayerDataResponse{data: data.to_bytearray(), net_id});
             
                 let mut instance = self.get_instance(&data.location);
-                let player = Player::new_rc(data, &self.server_name);
+                data.server_name = self.server_name.clone();
+                let player = Player::new_rc(data);
                 instance.bind_mut().spawn_player(player.clone(), net_id);
                 self.player_locations.insert(net_id, instance);
     
@@ -331,7 +345,10 @@ impl GameManager {
                 if let PlayerDataEntry::ActivePlayer{player, net_id: _, age: _} = pdataentry {
                     let data = match std::rc::Rc::try_unwrap(player) {
                         Ok(p) => p.into_inner().into_data(),
-                        Err(rc) => panic!("Couldn't unwrap player rc for {net_id}! refcount: {}", std::rc::Rc::strong_count(&rc)),
+                        Err(rc) => {
+                            godot_error!("Couldn't unwrap player rc for {net_id}! refcount: {}", std::rc::Rc::strong_count(&rc));
+                            rc.borrow().data.clone()
+                        },
                     };
                     self.player_datas.insert(pid, PlayerDataEntry::new_inactive(data));
                 };
@@ -367,32 +384,98 @@ impl GameManager {
             new_instance.bind_mut().spawn_player(player, net_id);
             *old_instance = new_instance;
         });
-        // self.player_locations.insert(net_id, instance.clone());
-
-        // new_instance.bind_mut().spawn_player(data, x, y, net_id);
     }
 
-    fn handle_generic_event(&mut self, event: GenericPlayerEvent, net_id: i32) {
-        if let Some(instance) = self.player_locations.get_mut(&net_id) {
-            instance.bind_mut().handle_generic_event(event, net_id);
+    /// Friend requests and accepts are handled here, otherwise gets passed to the player's instance
+    fn handle_generic_event(&mut self, event: GenericPlayerEvent, from_net_id: i32) {
+        match &event {
+            // Sent by inviter to invite invited player
+            GenericPlayerEvent::FriendRequest{pid: invited_pid} => {
+                // Gets net_id of the person invited and the player data of the person inviting
+                if let Some(invited_net_id) = self.get_pid_net_id(*invited_pid)
+                && let Some(inviter_player) = self.get_net_id_playerdata(from_net_id)
+                {
+                    if invited_net_id == from_net_id {return;}
+                    let b = inviter_player.borrow();
+                    let inviter_pid = b.pid();
+                    let inviter_name = b.data.name.clone();
+                    drop(b);
+                    // is_none() means that there was no previous invite like d
+                    if self.friend_invites.insert((inviter_pid, *invited_pid), 0.).is_none() {
+                        // Friend request response to the target player (if they're online on the same server)
+                        self.equeue.push_server(
+                            ServerEvent::GenericResponse{
+                                response: GenericServerResponse::GotFriendRequest{pid: inviter_pid, name: inviter_name}.to_bytearray(),
+                                net_id: invited_net_id
+                            }
+                        );
+                    }
+                }
+            },
+            // Send by invited player to accept invite from inviter
+            GenericPlayerEvent::FriendAccept{pid: inviter_pid} => {
+                // Gets player data of the person accepting invite
+                if let Some(invited_player) = self.get_net_id_playerdata(from_net_id) {
+                    let invited_pid = invited_player.borrow().pid();
+                    // There is a non-timed out invite for these pids
+                    if self.friend_invites.remove(&(*inviter_pid, invited_pid)).is_some() {
+                        if let Some((inviter_player, inviter_net_id)) = self.get_pid_active_player(*inviter_pid) {
+                            // So both inviter and invited are online right now and a valid 
+                            let mut invited_b = invited_player.borrow_mut();
+                            invited_b.data.friends.push(*inviter_pid);
+                            invited_b.set_private_change();
+                            let mut inviter_b = inviter_player.borrow_mut();
+                            inviter_b.data.friends.push(invited_pid);
+                            inviter_b.set_private_change();
+                            self.equeue.push_server(
+                                ServerEvent::PlayerChat{from: "".into(), text: "Friend invite accepted!".into(), is_dm: false, net_id: inviter_net_id}
+                            );
+                            self.equeue.push_server(
+                                ServerEvent::PlayerChat{from: "".into(), text: "Friend invite accepted!".into(), is_dm: false, net_id: from_net_id}
+                            );
+                        }
+                    }
+                    // This path means that the friend invite doesn't exist or is expired
+                    else {
+                        self.equeue.push_server(
+                            ServerEvent::PlayerChat{from: "".into(), text: "Friend invite expired.".into(), is_dm: false, net_id: from_net_id}
+                        );
+                    }
+                }
+            },
+            _ => {
+                if let Some(instance) = self.player_locations.get_mut(&from_net_id) {
+                    instance.bind_mut().handle_generic_event(event, from_net_id);
+                }
+            }
         }
     }
 
     fn broadcast_chat(&mut self, text: GString, target_pid: i32, net_id: i32) {
-        // Just regular broadcast then
-        // if target_pid == -1 {
-            if let Some(instance) = self.player_locations.get_mut(&net_id) {
-                instance.bind_mut().broadcast_chat(text, target_pid, net_id);
+        if let Some(instance) = self.player_locations.get_mut(&net_id) {
+            instance.bind_mut().broadcast_chat(text, target_pid, net_id);
+        }
+    }
+
+    /// Returns None if pid is not an online player
+    fn get_pid_net_id(&self, pid: i32) -> Option<i32> {
+        self.player_datas.get(&pid).and_then(|d| d.get_net_id())
+    }
+
+    /// Returns None if pid is not an online player
+    fn get_pid_active_player(&self, pid: i32) -> Option<(Rc<RefCell<Player>>, i32)> {
+        self.player_datas.get(&pid).and_then(|d| {
+            match d {
+                PlayerDataEntry::RawData{data: _, age: _} => None,
+                PlayerDataEntry::ActivePlayer{player, net_id, age: _} => Some((player.clone(), *net_id)),
             }
-        // }
-        // else {
-        //     if let Some(target_dataentry) = self.player_datas.get(&target_pid) {
-        //         if let PlayerDataEntry::ActivePlayer{player: _, net_id: target_net_id, age: _} = target_dataentry {
-        //             if let Some(instance) = self.player_locations.get_mut(&net_id) {
-        //                 instance.bind_mut().broadcast_dm(text, target_pid, a);
-        //             }
-        //         }
-        //     }
-        // }
+        })
+    }
+
+    /// Returns None if net_id is not on server
+    /// 
+    /// Accesses the instance to get the player data
+    fn get_net_id_playerdata(&self, net_id: i32) -> Option<Rc<RefCell<Player>>> {
+        self.player_locations.get(&net_id).and_then(|i| i.bind().get_net_id_playerdata(net_id))
     }
 }

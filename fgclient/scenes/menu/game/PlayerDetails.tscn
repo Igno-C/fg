@@ -1,6 +1,9 @@
-[gd_scene load_steps=2 format=3 uid="uid://dlp1xacdvnjfl"]
+[gd_scene load_steps=5 format=3 uid="uid://dlp1xacdvnjfl"]
 
 [ext_resource type="Script" uid="uid://b6tcg0viohin1" path="res://scripts/menu/game/player_details.gd" id="1_mmcur"]
+[ext_resource type="Texture2D" uid="uid://bdww048c0prbe" path="res://graphics/entities/debugplayer.png" id="2_g45ct"]
+[ext_resource type="PackedScene" uid="uid://bt1url4e2ii34" path="res://scenes/menu/game/InventoryItem.tscn" id="3_uw500"]
+[ext_resource type="Script" uid="uid://cl3poqhatv5li" path="res://scripts/menu/game/friends_list.gd" id="4_uw500"]
 
 [node name="PlayerDetails" type="Control"]
 layout_mode = 3
@@ -12,22 +15,23 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("1_mmcur")
 
-[node name="ColorRect" type="ColorRect" parent="."]
+[node name="PlayerStats" type="ColorRect" parent="."]
+visible = false
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -190.0
+offset_left = -200.0
 offset_top = -160.0
-offset_right = 190.0
+offset_right = 200.0
 offset_bottom = 160.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.25098, 0.25098, 0.25098, 0.831373)
+color = Color(0.25098, 0.25098, 0.25098, 0.862745)
 
-[node name="CloseButton" type="Button" parent="ColorRect"]
+[node name="CloseButton" type="Button" parent="PlayerStats"]
 layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
@@ -36,3 +40,151 @@ offset_left = -31.0
 offset_bottom = 31.0
 grow_horizontal = 0
 text = "X"
+
+[node name="StatGrid" type="GridContainer" parent="PlayerStats"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 103.0
+offset_top = 56.0
+grow_horizontal = 2
+grow_vertical = 2
+columns = 2
+
+[node name="PlayerName" type="Label" parent="PlayerStats"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 6.0
+offset_right = 367.0
+offset_bottom = 32.0
+theme_override_font_sizes/font_size = 20
+
+[node name="StatsLabel" type="Label" parent="PlayerStats"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 104.0
+offset_top = 32.0
+offset_right = 400.0
+offset_bottom = 64.0
+theme_override_font_sizes/font_size = 18
+text = "Skills:"
+
+[node name="PlayerTexture" type="TextureRect" parent="PlayerStats"]
+layout_mode = 0
+offset_left = 25.0
+offset_top = 36.0
+offset_right = 75.0
+offset_bottom = 86.0
+texture = ExtResource("2_g45ct")
+
+[node name="EquippedItemLabel" type="Label" parent="PlayerStats"]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 89.0
+offset_right = 96.0
+offset_bottom = 137.0
+text = "Equipped
+item"
+horizontal_alignment = 1
+
+[node name="EquippedSlot" parent="PlayerStats" instance=ExtResource("3_uw500")]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 31.0
+offset_top = 138.0
+offset_right = 67.0
+offset_bottom = 174.0
+
+[node name="InviteButton" type="Button" parent="PlayerStats"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 11.0
+offset_top = 214.0
+offset_right = 87.0
+offset_bottom = 273.0
+text = "Invite to
+friends"
+
+[node name="FriendsList" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -160.0
+offset_right = 200.0
+offset_bottom = 160.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.25098, 0.25098, 0.25098, 0.862745)
+script = ExtResource("4_uw500")
+
+[node name="MarginContainer" type="MarginContainer" parent="FriendsList"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="VBox" type="VBoxContainer" parent="FriendsList/MarginContainer"]
+layout_mode = 2
+
+[node name="FriendsLabel" type="Label" parent="FriendsList/MarginContainer/VBox"]
+layout_mode = 2
+text = "Friends"
+
+[node name="FriendsList" type="RichTextLabel" parent="FriendsList/MarginContainer/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = true
+
+[node name="RequestsVBox" type="VBoxContainer" parent="FriendsList/MarginContainer/VBox"]
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="HBoxContainer" type="GridContainer" parent="FriendsList/MarginContainer/VBox/RequestsVBox"]
+layout_mode = 2
+columns = 2
+
+[node name="Label" type="Label" parent="FriendsList/MarginContainer/VBox/RequestsVBox/HBoxContainer"]
+layout_mode = 2
+text = "Friend requests"
+
+[node name="DenyAllButton" type="Button" parent="FriendsList/MarginContainer/VBox/RequestsVBox/HBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Deny all"
+
+[node name="ScrollContainer" type="ScrollContainer" parent="FriendsList/MarginContainer/VBox/RequestsVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="RequestsList" type="VBoxContainer" parent="FriendsList/MarginContainer/VBox/RequestsVBox/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="CloseButton" type="Button" parent="FriendsList"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -31.0
+offset_bottom = 31.0
+grow_horizontal = 0
+text = "X"
+
+[connection signal="pressed" from="PlayerStats/CloseButton" to="." method="_on_close_button_pressed"]
+[connection signal="pressed" from="PlayerStats/InviteButton" to="." method="send_invite"]
+[connection signal="pressed" from="FriendsList/CloseButton" to="." method="_on_close_button_pressed"]

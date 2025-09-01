@@ -217,7 +217,7 @@ mod tests {
     use crate::playerdata::PlayerData;
 
     fn create_player_data() -> Rc<RefCell<PlayerData>> {
-        Rc::new(RefCell::new(PlayerData::null(-1)))
+        Rc::new(RefCell::new(PlayerData::from_name("".into(), -1)))
     }
 
     #[test]

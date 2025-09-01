@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://b6qjwd1fgnjn6"]
+
+[node name="PlayerStats" type="ColorRect"]
+offset_right = 300.0
+offset_bottom = 280.0
+color = Color(0.25098, 0.25098, 0.25098, 1)

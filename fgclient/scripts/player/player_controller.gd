@@ -75,7 +75,7 @@ func set_map(m: BaseMap) -> void:
 	map = m
 
 func on_tick() -> void:
-	if player == null:
+	if player == null or map == null:
 		return
 	
 	ticks_since_move += 1

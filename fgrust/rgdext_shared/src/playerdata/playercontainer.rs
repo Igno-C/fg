@@ -1,5 +1,5 @@
 use godot::prelude::*;
-use super::{item::ItemResource, *};
+use super::{item::ItemResource, skills::Skill, *};
 
 #[derive(GodotClass)]
 #[class(no_init, base=RefCounted)]
@@ -30,22 +30,10 @@ impl PlayerContainer {
 
     #[func]
     fn from_name(name: String, pid: i32) -> Gd<PlayerContainer> {
-        let mut data = PlayerData::default();
-        data.name = name;
-        data.pid = pid;
+        let data = PlayerData::from_name(name, pid);
         Gd::from_init_fn(|base| {
             PlayerContainer {
                 data,
-                base
-            }
-        })
-    }
-
-    #[func]
-    fn null(pid: i32) -> Gd<PlayerContainer> {
-        Gd::from_init_fn(|base| {
-            PlayerContainer {
-                data: PlayerData::null(pid),
                 base
             }
         })
@@ -73,13 +61,13 @@ impl PlayerContainer {
     }
 
     #[func]
-    fn set_location(&mut self, location: String) {
-        self.data.location = location;
+    fn get_friends(&self) -> Array<i32> {
+        Array::from(self.data.friends.as_slice())
     }
 
     #[func]
-    fn set_server_name(&mut self, name: String) {
-        self.data.server_name = name;
+    fn get_server_name(&self) -> GString {
+        GString::from(&self.data.server_name)
     }
 
     #[func]
@@ -88,29 +76,8 @@ impl PlayerContainer {
     }
 
     #[func]
-    fn set_pos(&mut self, pos: Vector2i) {
-        self.data.x = pos.x;
-        self.data.y = pos.y;
-    }
-
-    #[func]
     fn get_gold(&self) -> i32 {
         self.data.gold
-    }
-
-    #[func]
-    fn change_gold(&mut self, delta: i32) {
-        self.data.gold += delta;
-    }
-
-    #[func]
-    fn set_gold(&mut self, gold: i32) {
-        self.data.gold = gold;
-    }
-
-    #[func]
-    fn is_null(&self) -> bool {
-        self.data.is_null()
     }
 
     #[func]
@@ -147,5 +114,14 @@ impl PlayerContainer {
         else {
             -1
         }
+    }
+
+    #[func]
+    fn skill_array() -> Array<GString> {
+        let mut arr = Array::new();
+        for skill in Skill::skill_strs() {
+            arr.push(skill);
+        }
+        arr
     }
 }

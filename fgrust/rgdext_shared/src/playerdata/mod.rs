@@ -1,6 +1,7 @@
 use bitcode::{Decode, Encode};
 use godot::prelude::*;
 use item::Item;
+use skills::Skill;
 
 pub mod item;
 pub mod skills;
@@ -25,9 +26,19 @@ pub struct PlayerData {
     pub gold: i32,
     pub equipped_item: Option<Item>,
     pub items: [Option<Item>; MAX_ITEMS],
+    pub friends: Vec<i32>,
 }
 
 impl PlayerData {
+    pub fn from_name(name: String, pid: i32) -> Self {
+        Self {
+            name,
+            pid,
+            friends: Vec::new(),
+            ..Default::default()
+        }
+    }
+
     pub fn from_bytes(b: &[u8]) -> Result<Self, bitcode::Error> {
         // bitcode::deserialize(b)
         bitcode::decode(b)
@@ -40,29 +51,6 @@ impl PlayerData {
 
     pub fn to_bytearray(&self) -> PackedByteArray {
         PackedByteArray::from(self.to_bytes())
-    }
-
-    pub fn null(pid: i32) -> Self {
-        Self {
-            name: "".to_string(),
-            pid,
-
-            server_name: "".to_string(),
-            location: "".to_string(),
-
-            x: 0,
-            y: 0,
-
-            skills: skills::Skills::default(),
-            skill_progress: skills::SkillProgress::default(),
-            gold: 0,
-            equipped_item: None,
-            items: [const {None}; MAX_ITEMS],
-        }
-    }
-
-    pub fn is_null(&self) -> bool {
-        return self.location.is_empty();
     }
 
     pub fn get_item(&self, index: usize) -> Option<&Item> {
@@ -108,7 +96,26 @@ impl PlayerData {
             gold: 0,
             equipped_item: self.equipped_item.clone(),
             items: [const {None}; MAX_ITEMS],
+            friends: Vec::new(),
         }
+    }
+
+    /// Returns amount of levels gained
+    pub fn add_xp(&mut self, skill: Skill, amount: i32) -> i32 {
+        if self.skills[skill] >= 100 {return 0;}
+        self.skill_progress[skill] += amount;
+        let mut level = self.skills[skill] as i32;
+        while self.skill_progress[skill] > level * level * 100 {
+            level += 1;
+        }
+        let level_delta = level - self.skills[skill] as i32;
+        if level >= 100 {
+            self.skills[skill] = 100;
+            self.skill_progress[skill] = 0;
+            return level_delta;
+        }
+        self.skills[skill] = level as u8;
+        return level_delta;
     }
 }
 
@@ -131,6 +138,7 @@ impl Default for PlayerData {
             gold: 0,
             equipped_item: None,
             items: [const {None}; MAX_ITEMS],
+            friends: Vec::new(),
         }
     }
 }

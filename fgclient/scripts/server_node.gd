@@ -9,7 +9,7 @@ var token := ""
 signal player_update(x: int, y: int, speed: int, data_version: int, pid: int)
 signal entity_update(x: int, y: int, speed: int, data_version: int, entity_id: int)
 signal generic_response(event: GenericResponse)
-signal data_update(data: PlayerContainer, pid: int)
+signal data_update(data: PlayerContainer)
 signal edata_update(interactable: bool, walkable: bool, related_scene: String, data: Dictionary, entity_id: int)
 signal got_chat(from: String, text: String, is_dm: bool)
 
@@ -71,7 +71,6 @@ func _on_peer_disconnected(net_id: int) -> void:
 	connection_failure.emit("Disconnected from server")
 
 func send_move(x: int, y: int, speed: int) -> void:
-	print("Sending move")
 	if FAKELAG_ENABLED:
 		var timestamp := Time.get_ticks_msec()
 		print("Fakelagging...")
@@ -104,9 +103,8 @@ func pmove(x: int, y: int, speed: int, data_version: int, pid: int) -> void:
 
 func pdata(data: PackedByteArray) -> void:
 	var container := PlayerContainer.from_bytearray(data)
-	var pid: int = container.get_pid()
 	
-	data_update.emit(container, pid)
+	data_update.emit(container)
 
 func pchat(from: String, text: String, is_dm: bool) -> void:
 	got_chat.emit(from, text, is_dm)

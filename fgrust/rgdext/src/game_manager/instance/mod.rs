@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use godot::{classes::{FileAccess, ResourceLoader}, prelude::*};
 use crate::eventqueue::{EQueue, ServerEvent, GameEvent};
-use rgdext_shared::{basemap::{spatialhash::SpatialHash, CollisionArray}, genericevent::{GenericEvent, GenericPlayerEvent, GenericServerResponse}, playerdata::{PlayerData, MAX_ITEMS}};
+use rgdext_shared::{basemap::{spatialhash::SpatialHash, CollisionArray}, genericevent::{GenericPlayerEvent, GenericServerResponse}, playerdata::MAX_ITEMS};
 use player::Player; use entity::{Entities, GenericScriptedEntity, ResponseType, ScriptResponse};
 
 pub mod player;
@@ -25,9 +25,9 @@ pub struct Instance {
     /// net_id -> Player
     players: HashMap<i32, Rc<RefCell<Player>>>,
     playercount: i32,
-    /// (x, y, net_id)
+    /// (x, y, net_id), used to send out packets about a player's despawning
     deferred_despawns: Vec<(i32, i32, i32)>,
-    /// (x, y, entity_id)
+    /// (x, y, entity_id), used to send out packets about an entity's despawning
     deferred_entity_despawns: Vec<(i32, i32, i32)>,
 
     entities: Entities,
@@ -54,10 +54,10 @@ impl INode for Instance {
     fn process(&mut self, _delta: f64) {
         for despawn in std::mem::take(&mut self.deferred_despawns) {
             let (x, y, pid) = despawn;
-            let bytearray = PlayerData::null(pid).to_bytearray();
 
             self.spatial_hash.for_each_adjacent((x, y), |(net_id, _)| {
-                self.equeue.push_server(ServerEvent::PlayerDataResponse{data: bytearray.clone(), net_id: *net_id});
+                let response = GenericServerResponse::DespawnPlayer{pid};
+                self.equeue.push_server(ServerEvent::GenericResponse{response: response.to_bytearray(), net_id: *net_id});
             });
         }
         for edespawn in std::mem::take(&mut self.deferred_entity_despawns) {
@@ -320,9 +320,13 @@ impl Instance {
                 }
             },
             ResponseType::DespawnSelf{} => {
-                let b = entity.bind();
+                let b = entity.bind_mut();
                 let (x, y) = (b.pos.x, b.pos.y);
-                self.deferred_entity_despawns.push((x, y, b.entity_id));
+                let entity_id = b.entity_id;
+                drop(b);
+                entity.queue_free();
+                self.deferred_entity_despawns.push((x, y, entity_id));
+                self.entities.remove_entity((x, y), entity_id);
             },
             ResponseType::RegisterEntity{entity} => {self.entities.register_entity(entity.clone());}
             ResponseType::SystemChatMessage{text, net_id} => {
@@ -386,7 +390,7 @@ impl Instance {
                     }   
                 }
             },
-            GenericPlayerEvent::Err => {
+            _ => {
 
             },
         }
@@ -424,5 +428,9 @@ impl Instance {
                 );
             }
         }
+    }
+
+    pub fn get_net_id_playerdata(&self, net_id: i32) -> Option<Rc<RefCell<Player>>> {
+        self.players.get(&net_id).map(|p| p.clone())
     }
 }

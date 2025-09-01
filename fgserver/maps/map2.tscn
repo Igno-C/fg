@@ -2,8 +2,8 @@
 
 [ext_resource type="Script" uid="uid://b3ulfsqahp2ls" path="res://entities/generic_instance_portal.gd" id="1_rn5oq"]
 [ext_resource type="Script" uid="uid://bnlpapopcb6wh" path="res://entities/generic_portal_entity.gd" id="2_gc36p"]
-[ext_resource type="Script" uid="uid://c7bflugjvo4uh" path="res://entities/generic_tree.gd" id="3_frp5n"]
-[ext_resource type="Script" uid="uid://diyx86gwwrml7" path="res://entities/generic_cooldownchest.gd" id="4_yj6n1"]
+[ext_resource type="Script" uid="uid://coopn626hml2r" path="res://entities/generic_tree.gd" id="3_frp5n"]
+[ext_resource type="Script" uid="uid://b5gfg3va2op1w" path="res://entities/generic_cooldownchest.gd" id="4_yj6n1"]
 [ext_resource type="ItemResource" uid="uid://ch3mj0fe4w0oq" path="res://items/axe.tres" id="5_pkcb3"]
 
 [node name="Entities" type="Node"]

@@ -10,12 +10,22 @@ var index: int
 
 signal slot_clicked(index: int)
 
+func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		if event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			emit_index()
+
+func emit_index() -> void:
+	slot_clicked.emit(index)
+
 func set_index(i: int) -> void:
 	index = i
 
 func reset_data() -> void:
 	item_count.text = ""
 	item.texture = null
+	item.visible = true
+	tooltip_text = ""
 
 func set_item(item: ItemResource) -> void:
 	reset_data()
@@ -24,6 +34,7 @@ func set_item(item: ItemResource) -> void:
 	load_item_icon(item.id_string)
 	if item.count > 1:
 		item_count.text = str(item.count)
+	tooltip_text = item.description
 
 func load_item_icon(id_string: String) -> void:
 	var texture: Texture2D = load("res://graphics/icons/%s.png" % id_string)
@@ -32,6 +43,12 @@ func load_item_icon(id_string: String) -> void:
 		print("Couldn't find item icon for ", id_string)
 	else:
 		item.texture = texture
+
+func set_icon_visible(vis: bool) -> void:
+	item.visible = vis
+
+func get_icon_texture() -> Texture2D:
+	return item.texture
 
 func _on_hover() -> void:
 	highlight.visible = true

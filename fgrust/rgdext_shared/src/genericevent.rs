@@ -36,6 +36,20 @@ impl GenericEvent {
         })
     }
 
+    #[func]
+    fn friend_request(pid: i32) -> Gd<Self> {
+        Gd::from_init_fn(|base| {
+            Self{event: GenericPlayerEvent::FriendRequest{pid}, base}
+        })
+    }
+
+    #[func]
+    fn friend_accept(pid: i32) -> Gd<Self> {
+        Gd::from_init_fn(|base| {
+            Self{event: GenericPlayerEvent::FriendAccept{pid}, base}
+        })
+    }
+
     // #[func]
     // fn interaction_with_item(x: i32, y: i32, item_index: i32) -> Gd<Self> {
     //     Gd::from_init_fn(|base| {
@@ -54,6 +68,8 @@ pub enum GenericPlayerEvent {
     Interaction{x: i32, y: i32, entity_id: i32},
     SwapItems{from: usize, to: usize},
     EquipItem{from: usize},
+    FriendRequest{pid: i32},
+    FriendAccept{pid: i32},
     Err
 }
 
@@ -101,11 +117,20 @@ impl GenericResponse {
     const RESPONSE_ERR: i32 = -1;
     #[constant]
     const RESPONSE_LOAD_MAP: i32 = 0;
+    #[constant]
+    const RESPONSE_GOT_FRIEND_REQUEST: i32 = 1;
+    #[constant]
+    const RESPONSE_NEW_FRIEND: i32 = 2;
+    #[constant]
+    const RESPONSE_DESPAWN_PLAYER: i32 = 3;
 
     #[func]
     pub fn response_type(&self) -> i32 {
         match &self.response {
             GenericServerResponse::LoadMap{mapname: _} => Self::RESPONSE_LOAD_MAP,
+            GenericServerResponse::GotFriendRequest{pid: _, name: _} => Self::RESPONSE_GOT_FRIEND_REQUEST,
+            GenericServerResponse::NewFriend{pid: _} => Self::RESPONSE_NEW_FRIEND,
+            GenericServerResponse::DespawnPlayer{pid: _} => Self::RESPONSE_DESPAWN_PLAYER,
             GenericServerResponse::Err => Self::RESPONSE_ERR,
         }
     }
@@ -117,11 +142,44 @@ impl GenericResponse {
             _ => "".to_string(),
         }
     }
+
+    #[func]
+    /// Returns a dictionary with fields "pid": int and "name": String
+    pub fn as_got_friend_request(&self) -> Dictionary {
+        match &self.response {
+            GenericServerResponse::GotFriendRequest{pid, name} => {
+                let mut dict = Dictionary::new();
+                dict.set("pid", *pid);
+                dict.set("name", GString::from(name));
+                dict
+            },
+            _ => Dictionary::new(),
+        }
+    }
+
+    #[func]
+    fn as_new_friend(&self) -> i32 {
+        match &self.response {
+            GenericServerResponse::NewFriend{pid} => {*pid},
+            _ => -1,
+        }
+    }
+
+    #[func]
+    fn as_despawn_player(&self) -> i32 {
+        match &self.response {
+            GenericServerResponse::DespawnPlayer{pid} => {*pid},
+            _ => -1,
+        }
+    }
 }
 
 #[derive(Decode, Encode, Clone)]
 pub enum GenericServerResponse {
     LoadMap{mapname: String},
+    GotFriendRequest{pid: i32, name: String},
+    NewFriend{pid: i32},
+    DespawnPlayer{pid: i32},
     Err,
 }
 

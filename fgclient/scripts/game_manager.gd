@@ -8,13 +8,16 @@ extends Node
 var player_controller: PlayerController = null
 var map: BaseMap = null
 
-var player_pid = -1
+var player_pid := -1
+var player_friends: Array[int] = []
 var players: Dictionary[int, PlayerEntity] = {}
 var entities: Dictionary[int, GenericEntity] = {}
 
 signal set_debug_label(text: String)
 signal your_data_updated(data: PlayerContainer)
 signal set_context_menu(menu: PopupPanel)
+signal got_friend_request(pid: int, uname: String)
+signal got_friend_update(uname: String, server: String)
 
 func _ready() -> void:
 	ServerNode.player_update.connect(_on_player_update)
@@ -22,6 +25,15 @@ func _ready() -> void:
 	ServerNode.generic_response.connect(_on_generic_response)
 	ServerNode.entity_update.connect(_on_entity_update)
 	ServerNode.edata_update.connect(_on_edata_update)
+	var friend_timer := Timer.new()
+	friend_timer.autostart = true
+	friend_timer.wait_time = 20.
+	friend_timer.timeout.connect(get_friend_data)
+	add_child(friend_timer)
+
+func get_friend_data() -> void:
+	for friend in player_friends:
+		ServerNode.send_data_request(friend)
 
 func _on_player_update(x: int, y: int, speed: int, data_version: int, pid: int) -> void:
 	print("pid %s got update: %s, %s, %s, dataver %s" % [pid, x, y, speed, data_version])
@@ -40,18 +52,22 @@ func _on_player_update(x: int, y: int, speed: int, data_version: int, pid: int) 
 	else:
 		p.move(Vector2i(x, y), speed)
 	
-func _on_data_update(data: PlayerContainer, pid: int) -> void:
+func _on_data_update(data: PlayerContainer) -> void:
+	var pid = data.get_pid()
 	print("pid %s got pdata" % pid)
-	if data.is_null():
-		despawn_player(pid)
-		return
-	var p: PlayerEntity
-	if not players.has(pid):
-		spawn_player(pid)
-	p = players[pid]
-	p.receive_data(data)
+	if player_friends.has(pid):
+		got_friend_update.emit(data.get_name(), data.get_server_name())
 	if pid == player_pid:
+		if player_friends.is_empty():
+			player_friends = data.get_friends()
+			get_friend_data()
+		else:
+			player_friends = data.get_friends()
 		your_data_updated.emit(data)
+	if not players.has(pid):
+		return
+	var p := players[pid]
+	p.receive_data(data)
 
 func _on_entity_update(x: int, y: int, speed: int, data_version: int, entity_id: int) -> void:
 	print("entity %s got update: %s, %s, %s, dataver %s" % [entity_id, x, y, speed, data_version])
@@ -93,7 +109,15 @@ func _on_generic_response(response: GenericResponse) -> void:
 		GenericResponse.RESPONSE_ERR:
 			print("Got err generic response!")
 		GenericResponse.RESPONSE_LOAD_MAP:
+			print("Got load map generic response")
 			load_map(response.as_load_map())
+		GenericResponse.RESPONSE_GOT_FRIEND_REQUEST:
+			var resp = response.as_got_friend_request()
+			print("Got got friend request generic response: ", resp)
+			got_friend_request.emit(resp["pid"], resp["name"])
+		GenericResponse.RESPONSE_DESPAWN_PLAYER:
+			var resp = response.as_despawn_player()
+			despawn_player(resp)
 
 func load_map(mapname: String):
 	if map != null: map.queue_free()
@@ -110,8 +134,8 @@ func load_map(mapname: String):
 	map.name = mapname
 	game_node.add_child(map)
 	game_node.move_child(map, 0)
-	player_controller.map = map
-	player_controller.player.data.set_location(mapname)
+	if player_controller != null:
+		player_controller.map = map
 
 func spawn_player(pid: int, data: PlayerContainer = null) -> PlayerEntity:
 	print("Spawning new player entity for pid %s" % pid)
@@ -124,15 +148,18 @@ func spawn_player(pid: int, data: PlayerContainer = null) -> PlayerEntity:
 			spawn_player_controller()
 		player_controller.player = p
 		player_controller.camera = camera
+		if map != null:
+			player_controller.map = map
 	
 	players[pid] = p
 	game_node.add_child(p)
 	
 	return p
 
-func despawn_player(net_id: int) -> void:
-	players[net_id].queue_free()
-	players.erase(net_id)
+func despawn_player(pid: int) -> void:
+	print("Despawning player with pid ", pid)
+	players[pid].queue_free()
+	players.erase(pid)
 
 func spawn_entity(entity_id: int) -> GenericEntity:
 	print("Spawning new generic entity for entity id %s" % entity_id)
@@ -144,6 +171,7 @@ func spawn_entity(entity_id: int) -> GenericEntity:
 	return e
 
 func despawn_entity(entity_id: int) -> void:
+	print("Despawning entity with entity id ", entity_id)
 	entities[entity_id].queue_free()
 	entities.erase(entity_id)
 
@@ -168,6 +196,7 @@ func open_context_at(pos: Vector2i) -> void:
 	context_menu.entities = entities_at
 	context_menu.players = players_at
 	context_menu.related_pos = pos
+	context_menu.player_pid = player_pid
 	set_context_menu.emit(context_menu)
 
 func interact_with_entity(entity: GenericEntity) -> void:

@@ -82,8 +82,7 @@ impl Player {
         self.data
     }
 
-    pub fn new_rc(mut data: PlayerData, server_name: impl ToString) -> Rc<RefCell<Self>> {
-        data.server_name = server_name.to_string();
+    pub fn new_rc(data: PlayerData) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(
             Self {
                 ticks_since_move: 0,

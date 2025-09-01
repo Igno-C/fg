@@ -47,6 +47,8 @@ func _on_connection_success() -> void:
 	
 	manager.your_data_updated.connect(game_menu.update_inventory)
 	manager.set_context_menu.connect(game_menu.set_context_menu)
+	manager.got_friend_request.connect(game_menu._on_get_friend_request)
+	manager.got_friend_update.connect(game_menu._on_friend_data_update)
 	
 	game_node.add_child(manager)
 	ui_node.add_child(game_menu)
