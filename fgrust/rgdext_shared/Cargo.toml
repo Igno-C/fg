@@ -4,10 +4,15 @@ version = "0.1.0"
 edition = "2024"
 
 [lib]
-crate-type = ["lib"] # Just a Rust library, to be imported by binaries
+crate-type = ["rlib"] # Just a Rust library, to be imported by binaries
 
 [dependencies]
 godot = {workspace = true}
 # serde = {version = "1.0.219", features = ["derive"]}
 bitcode = {version = "0.6.6"} #, features = ["serde"]
-# enum-map = "2.7.3"
+
+[features]
+default = []
+client = []
+server = []
+serverutil = []

@@ -79,6 +79,33 @@ impl PlayerData {
         return false;
     }
 
+    /// Returns true if item and amount successfully removed. Assumes the amount to be removed is valid
+    ///
+    /// Also checks equipped slot
+    pub fn remove_item(&mut self, id_string: &str, amount: i32) -> bool {
+        for item_slot in &mut self.items {
+            if let Some(item) = item_slot.as_mut() {
+                if item.id_string() == id_string {
+                    item.count -= amount;
+                    if item.count <= 0 {
+                        *item_slot = None;
+                    }
+                    return true;
+                }
+            }
+        }
+        if let Some(item) = self.equipped_item.as_mut() {
+            if item.id_string() == id_string {
+                item.count -= amount;
+                if item.count <= 0 {
+                    self.equipped_item = None;
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// Gets all player data except for skill progress, gold and inventory
     pub fn get_minimal(&self) -> Self {
         Self {

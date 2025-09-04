@@ -1,48 +1,30 @@
+use std::{cell::RefCell, rc::Rc};
 pub mod benchmark;
+pub mod spatialhash;
 
-pub trait Positioned {
-    fn get_pos(&self) -> (i32, i32);
+pub struct TestObject {
+    pub pos: (i32, i32),
+    pub dummy_data: [u8; 400]
 }
 
-pub trait Positionable {
-    fn set_pos(&mut self, x: i32, y: i32);
-}
-
-pub trait Identifiable {
-    fn get_id(&self) -> impl Eq;
-}
-
-impl<T: Positioned> Positioned for &T {
-    fn get_pos(&self) -> (i32, i32) {
-        (*self).get_pos()
+impl TestObject {
+    pub fn new_rc(pos: (i32, i32)) -> Rc<RefCell<TestObject>>  {
+        Rc::new(RefCell::new(
+            TestObject {
+                pos,
+                dummy_data: [0; 400]
+            }
+        ))
     }
 }
 
-impl Positioned for (i32, i32) {
-    fn get_pos(&self) -> (i32, i32) {
-        *self
-    }
-}
-
-impl Positionable for (i32, i32) {
-    fn set_pos(&mut self, x: i32, y: i32) {
-        *self = (x, y);
-    }
-}
-
-fn distance(o1: impl Positioned, o2: impl Positioned) -> i32 {
-    let (x1, y1) = o1.get_pos();
-    let (x2, y2) = o2.get_pos();
-
-    (x1-x2).abs().max((y1-y2).abs())
-}
-
-pub struct LazyChecker<T: Positioned + Positionable> {
+#[derive(Clone)]
+pub struct LazyChecker {
     distance: i32,
-    objects: Vec<T>
+    objects: Vec<(i32, Rc<RefCell<TestObject>>)>
 }
 
-impl<T: Positioned + Positionable> LazyChecker<T> {
+impl LazyChecker {
     pub fn new(distance: i32) -> Self {
         Self {
             distance,
@@ -50,21 +32,31 @@ impl<T: Positioned + Positionable> LazyChecker<T> {
         }
     }
 
-    pub fn insert(&mut self, o: T) {
-        self.objects.push(o);
+    pub fn insert(&mut self, id: i32, o: Rc<RefCell<TestObject>>) {
+        self.objects.push((id, o));
     }
 
-    pub fn get_adjacent(&self, pos: (i32, i32)) -> impl Iterator<Item = &T> {
+    pub fn get_adjacent(&self, pos: (i32, i32)) -> impl Iterator<Item = &(i32, Rc<RefCell<TestObject>>)> {
         self.objects.iter().filter(move |o| {
-            distance(o, &pos) <= self.distance
+            distance(o.1.borrow().pos, pos) <= self.distance
         })
     }
 
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut T> {
-        self.objects.iter_mut()
+    pub fn get_object(&mut self, id: i32) -> &Rc<RefCell<TestObject>> {
+        self.objects.iter().find_map(|o| {
+            (o.0 == id).then_some(&o.1)
+        }).unwrap()
+    }
+
+    pub fn remove(&mut self, id: i32) {
+        let index = self.objects.iter().position(|o| o.0 == id).unwrap();
+        self.objects.remove(index);
     }
 }
 
+fn distance(a: (i32, i32), b: (i32, i32)) -> i32 {
+    (a.0 - b.0).abs().max((a.1 - b.1).abs())
+}
 
 // pub struct SpatialHashChecker<T: Positioned + Positionable> {
 //     // topleft: (i32, i32),

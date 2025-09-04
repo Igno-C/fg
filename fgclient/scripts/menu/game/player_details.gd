@@ -6,12 +6,14 @@ extends Control
 @onready var equipped_slot: InventoryItem = $%EquippedSlot
 @onready var friends_list: ColorRect = $FriendsList
 @onready var invite_button: Button = $%InviteButton
+@onready var dm_button: Button = $%DmButton
 
 
 var shown_pid: int = -1
 var skill_nodes: Dictionary[String, Control] = {}
 #var friend_requests: Array[int] = []
 signal system_chat(text: String)
+signal set_dm_target(uname: String, pid: int)
 
 func _ready() -> void:
 	var player_stat_scene: PackedScene = load("res://scenes/menu/game/PlayerStat.tscn")
@@ -45,7 +47,10 @@ func send_invite() -> void:
 	var event := GenericEvent.friend_request(shown_pid)
 	ServerNode.send_event(event)
 
-func populate(data: PlayerContainer, show_invite_btn: bool) -> void:
+func _on_dm_button_pressed() -> void:
+	set_dm_target.emit(player_name.text, shown_pid)
+
+func populate(data: PlayerContainer, show_invite_btn: bool, show_dm_btn: bool) -> void:
 	player_stats.visible = true
 	
 	for skill in PlayerContainer.skill_array():
@@ -53,8 +58,10 @@ func populate(data: PlayerContainer, show_invite_btn: bool) -> void:
 		var xp = data.get_stat_progress(skill)
 		skill_nodes[skill].set_stats(level, xp)
 	player_name.text = data.get_name()
+	player_name.tooltip_text = "Player id: " + str(data.get_pid())
 	equipped_slot.set_item(data.get_equipped_item())
 	invite_button.visible = show_invite_btn
+	dm_button.visible = show_dm_btn
 	shown_pid = data.get_pid()
 
 func _on_close_button_pressed() -> void:

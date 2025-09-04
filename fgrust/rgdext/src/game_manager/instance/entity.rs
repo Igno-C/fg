@@ -156,6 +156,27 @@ impl ScriptResponse {
     }
 
     #[func]
+    fn take_item(id_string: GString, amount: i32, net_id: i32) -> Gd<ScriptResponse> {
+        let response = ResponseType::TakeItem{id_string, amount, net_id};
+        
+        Gd::from_init_fn(|base| ScriptResponse {response, base})
+    }
+
+    #[func]
+    fn change_gold(amount: i32, net_id: i32) -> Gd<ScriptResponse> {
+        let response = ResponseType::ChangeGold{amount, net_id};
+        
+        Gd::from_init_fn(|base| ScriptResponse {response, base})
+    }
+
+    #[func]
+    fn give_xp(skill: GString, amount: i32, net_id: i32) -> Gd<ScriptResponse> {
+        let response = ResponseType::GiveXp{skill, amount, net_id};
+        
+        Gd::from_init_fn(|base| ScriptResponse {response, base})
+    }
+
+    #[func]
     fn despawn_self() -> Gd<ScriptResponse> {
         let response = ResponseType::DespawnSelf{};
         
@@ -189,6 +210,9 @@ pub enum ResponseType {
     MovePlayer{x: i32, y: i32, speed: i32, net_id: i32},
     MoveSelf{x: i32, y: i32, speed: i32},
     GiveItem{item: Gd<ItemResource>, net_id: i32},
+    TakeItem{id_string: GString, amount: i32, net_id: i32},
+    ChangeGold{amount: i32, net_id: i32},
+    GiveXp{skill: GString, amount: i32, net_id: i32},
     DespawnSelf{},
     RegisterEntity{entity: Gd<GenericScriptedEntity>},
     SystemChatMessage{text: GString, net_id: i32},

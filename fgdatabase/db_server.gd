@@ -122,7 +122,7 @@ func _retrieve(pid: int, lock: bool = false) -> void:
 	rpc_id(server_id, "_retrieve", pid, data)
 
 @rpc("any_peer", "call_remote", "reliable", 1)
-func relay_dm(from: String, text: String, target_pid: int) -> void:
+func _relay_dm(text: String, from: String, from_pid: int, target_pid: int) -> void:
 	db.query_with_bindings(check_lock_query, [target_pid])
 	
 	if db.query_result_by_reference.is_empty():
@@ -130,6 +130,7 @@ func relay_dm(from: String, text: String, target_pid: int) -> void:
 	
 	var lock_id = db.query_result_by_reference[0]["lock_id"]
 	if lock_id != null:
-		rpc_id(lock_id, "relay_dm", from, text, target_pid)
+		print("Relaying dm for pid %s to server %s" % [target_pid, lock_id])
+		rpc_id(lock_id, "_relay_dm", text, from, from_pid, target_pid)
 	else:
 		print("Received dm relay for unlocked pid: ", target_pid)

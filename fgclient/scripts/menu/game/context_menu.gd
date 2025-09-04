@@ -3,13 +3,14 @@ extends Panel
 
 @onready var vbox: VBoxContainer = get_node("VBox")
 
-signal inspect_player(data: PlayerContainer, show_invite_btn: bool)
+signal inspect_player(data: PlayerContainer, show_invite_btn: bool, show_dm_button: bool)
 signal interact_with_entity(entity_id: int)
 signal walk_to_pos(pos: Vector2i)
 
 var related_pos: Vector2i
 var players: Array[PlayerEntity]
 var entities: Array[GenericEntity]
+var friends: Array[int]
 var player_pid: int
 
 func _ready() -> void:
@@ -32,8 +33,10 @@ func add_inspect_option(data: PlayerContainer) -> void:
 	var new_button = Button.new()
 	new_button.text = interact_string
 	
-	var show_invite_btn := data.get_pid() != player_pid
-	new_button.pressed.connect(inspect_player.emit.bind(data, show_invite_btn))
+	var pid := data.get_pid()
+	var show_invite_btn := pid != player_pid and not friends.has(pid)
+	var show_dm_button := pid != player_pid
+	new_button.pressed.connect(inspect_player.emit.bind(data, show_invite_btn, show_dm_button))
 	new_button.pressed.connect(self.queue_free)
 	vbox.add_child(new_button)
 

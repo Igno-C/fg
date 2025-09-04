@@ -76,6 +76,7 @@ impl INode for GameManager {
         db_server.connect("dm_received", &Callable::from_object_method(&self.to_gd(), "_on_dm_received"));
         self.base_mut().connect("save", &Callable::from_object_method(&db_server, "save"));
         self.base_mut().connect("retrieve", &Callable::from_object_method(&db_server, "retrieve"));
+        self.base_mut().connect("relay_dm", &Callable::from_object_method(&db_server, "relay_dm"));
 
         godot_print!("Game manager node ready.\n");
     }
@@ -126,7 +127,9 @@ impl INode for GameManager {
                 GameEvent::PlayerDisconnected{net_id} => self.player_despawn(net_id),
                 GameEvent::PlayerJoinInstance{mapname, x, y, net_id} => self.player_join_instance(&mapname, x, y, net_id),
                 GameEvent::PlayerChat{text, target_pid, net_id} => self.broadcast_chat(text, target_pid, net_id),
-                GameEvent::PlayerDm{from, text, target_pid} => self.signals().relay_dm().emit(&from, &text, target_pid),
+                GameEvent::PlayerDm{text, from, from_pid, target_pid} => {
+                    self.signals().relay_dm().emit(&text, &from, from_pid, target_pid);
+                },
                 GameEvent::GenericEvent{event, net_id} => self.handle_generic_event(event, net_id),
                 GameEvent::PDataRequest{pid, net_id} => self.player_retrieve_data(pid, net_id),
                 GameEvent::EDataRequest{x, y, entity_id, net_id} => self.player_retrieve_edata(x, y, entity_id, net_id),
@@ -144,7 +147,7 @@ impl GameManager {
     fn save(pid: i32, data: PackedByteArray, unlock: bool);
 
     #[signal]
-    fn relay_dm(from: GString, text: GString, target_pid: i32);
+    fn relay_dm(text: GString, from: GString, from_pid: i32, target_pid: i32);
 
     pub fn set_equeue(&mut self, e: EQueue) {
         self.equeue = e;
@@ -179,7 +182,7 @@ impl GameManager {
             }
         }
 
-        self.base_mut().set_process(false);
+        // self.base_mut().set_process(false);
     }
 
     #[func]
@@ -230,11 +233,11 @@ impl GameManager {
     }
 
     #[func]
-    fn _on_dm_received(&self, from: GString, text: GString, target_pid: i32) {
+    fn _on_dm_received(&self, text: GString, from: GString, from_pid: i32, target_pid: i32) {
         if let Some(dataentry) = self.player_datas.get(&target_pid) {
             if let PlayerDataEntry::ActivePlayer{player: _, net_id, age: _} = dataentry {
                 self.equeue.push_server(
-                    ServerEvent::PlayerChat{from, text, is_dm: true, net_id: *net_id}
+                    ServerEvent::PlayerChat{text, from, from_pid, is_dm: true, net_id: *net_id}
                 );
             }
         }
@@ -428,17 +431,17 @@ impl GameManager {
                             inviter_b.data.friends.push(invited_pid);
                             inviter_b.set_private_change();
                             self.equeue.push_server(
-                                ServerEvent::PlayerChat{from: "".into(), text: "Friend invite accepted!".into(), is_dm: false, net_id: inviter_net_id}
+                                ServerEvent::PlayerChat{text: "Friend invite accepted!".into(), from: "".into(), from_pid: -1, is_dm: false, net_id: inviter_net_id}
                             );
                             self.equeue.push_server(
-                                ServerEvent::PlayerChat{from: "".into(), text: "Friend invite accepted!".into(), is_dm: false, net_id: from_net_id}
+                                ServerEvent::PlayerChat{text: "Friend invite accepted!".into(), from: "".into(), from_pid: -1, is_dm: false, net_id: from_net_id}
                             );
                         }
                     }
                     // This path means that the friend invite doesn't exist or is expired
                     else {
                         self.equeue.push_server(
-                            ServerEvent::PlayerChat{from: "".into(), text: "Friend invite expired.".into(), is_dm: false, net_id: from_net_id}
+                            ServerEvent::PlayerChat{text: "Friend invite expired.".into(), from: "".into(), from_pid: -1, is_dm: false, net_id: from_net_id}
                         );
                     }
                 }

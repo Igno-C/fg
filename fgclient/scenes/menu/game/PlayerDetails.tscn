@@ -101,13 +101,24 @@ offset_bottom = 174.0
 unique_name_in_owner = true
 layout_mode = 0
 offset_left = 11.0
-offset_top = 214.0
+offset_top = 182.0
 offset_right = 87.0
-offset_bottom = 273.0
+offset_bottom = 241.0
 text = "Invite to
 friends"
 
+[node name="DmButton" type="Button" parent="PlayerStats"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 11.0
+offset_top = 250.0
+offset_right = 87.0
+offset_bottom = 309.0
+text = "Send
+message"
+
 [node name="FriendsList" type="ColorRect" parent="."]
+visible = false
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -187,4 +198,5 @@ text = "X"
 
 [connection signal="pressed" from="PlayerStats/CloseButton" to="." method="_on_close_button_pressed"]
 [connection signal="pressed" from="PlayerStats/InviteButton" to="." method="send_invite"]
+[connection signal="pressed" from="PlayerStats/DmButton" to="." method="_on_dm_button_pressed"]
 [connection signal="pressed" from="FriendsList/CloseButton" to="." method="_on_close_button_pressed"]

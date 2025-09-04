@@ -1,6 +1,5 @@
 use godot::prelude::*;
-pub use rgdext_shared::{basemap::*, playerdata::*, serverconnector::*};
-// pub use rgdext_shared;
+extern crate rgdext_shared;
 
 mod server;
 mod eventqueue;

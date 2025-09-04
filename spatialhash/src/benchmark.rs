@@ -1,12 +1,5 @@
-pub fn benchmark<F: FnOnce() -> ()>(name: impl ToString, f: F) {
-    println!("\nPerforming benchmark: {}", name.to_string());
 
-    let now = std::time::Instant::now();
-    f();
-    let duration = now.elapsed();
-    
-    println!("Operation finished in {:.2} s, {} ms, {} us\n", duration.as_secs_f32(), duration.as_millis(), duration.as_micros());
-}
+
 
 pub fn benchmark_micros<F: FnOnce() -> ()>(f: F) -> u128 {
     let now = std::time::Instant::now();
@@ -16,7 +9,7 @@ pub fn benchmark_micros<F: FnOnce() -> ()>(f: F) -> u128 {
     return duration.as_micros();
 }
 
-pub fn benchmark_avg<T, P: Fn() -> T, F: Fn(T) -> ()>(prep: P, bench: F, repeat_count: usize) -> (f64, f64) {
+pub fn benchmark_avg<T, P: FnMut() -> T, F: FnMut(T) -> ()>(mut prep: P, mut bench: F, repeat_count: usize) -> (f64, f64) {
     let mut durations = Vec::with_capacity(repeat_count);
     
     for _ in 0..repeat_count {
@@ -36,7 +29,7 @@ pub fn benchmark_avg<T, P: Fn() -> T, F: Fn(T) -> ()>(prep: P, bench: F, repeat_
 
     let std_dev = variance.sqrt();
 
-    println!("Average of {:.1} us, standard deviation of {:.1} us", average, std_dev);
+    println!("Average of {:.1} us, standard deviation of {:.1} us after {} repeats", average, std_dev, repeat_count);
 
     (average, std_dev)
 }

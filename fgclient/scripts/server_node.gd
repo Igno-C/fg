@@ -11,7 +11,7 @@ signal entity_update(x: int, y: int, speed: int, data_version: int, entity_id: i
 signal generic_response(event: GenericResponse)
 signal data_update(data: PlayerContainer)
 signal edata_update(interactable: bool, walkable: bool, related_scene: String, data: Dictionary, entity_id: int)
-signal got_chat(from: String, text: String, is_dm: bool)
+signal got_chat(text: String, from: String, from_pid: int, is_dm: bool)
 
 signal connection_success
 signal connection_failure(err: String)
@@ -35,6 +35,9 @@ func _ready() -> void:
 	mult.peer_disconnected.connect(_on_peer_disconnected)
 	
 	mult.connection_failed.connect(connection_failure.emit.bind("Error: Failed to connect to server"))
+
+func disconnect_from_server() -> void:
+	network.disconnect_peer(1)
 
 func connect_to_server(ip: String, port: int, t: String) -> void:
 	network = ENetMultiplayerPeer.new()
@@ -106,8 +109,8 @@ func pdata(data: PackedByteArray) -> void:
 	
 	data_update.emit(container)
 
-func pchat(from: String, text: String, is_dm: bool) -> void:
-	got_chat.emit(from, text, is_dm)
+func pchat(text: String, from: String, from_pid: int, is_dm: bool) -> void:
+	got_chat.emit(text, from, from_pid, is_dm)
 
 func emove(x: int, y: int, speed: int, data_version: int, entity_id: int) -> void:
 	entity_update.emit(x, y, speed, data_version, entity_id)

@@ -8,4 +8,4 @@ crate-type = ["cdylib"]  # Compile this crate to a dynamic C library
 
 [dependencies]
 godot = {workspace = true}
-rgdext_shared = {path = "../rgdext_shared"}
+rgdext_shared = {path = "../rgdext_shared", features = ["client"]}

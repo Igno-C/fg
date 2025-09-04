@@ -2,7 +2,7 @@ extends ServerConnector
 
 signal retrieved(pid: int, data: PackedByteArray)
 signal request_save(pid: int)
-signal dm_received(from: String, text: String, target_pid: int)
+signal dm_received(text: String, from: String, from_pid: int, target_pid: int)
 
 func _ready() -> void:
 	var config := ConfigFile.new()
@@ -18,6 +18,9 @@ func _ready() -> void:
 	set_client(port, ip)
 	
 	start_server()
+
+func relay_dm(text: String, from: String, from_pid: int, target_pid: int) -> void:
+	rpc_id(1, "_relay_dm", text, from, from_pid, target_pid)
 
 func save(pid: int, data: PackedByteArray, unlock: bool) -> void:
 	print("Saving data for pid ", pid);
@@ -37,5 +40,5 @@ func _retrieve(pid: int, data: PackedByteArray) -> void:
 	retrieved.emit(pid, data)
 
 @rpc("any_peer", "call_remote", "reliable", 1)
-func relay_dm(from: String, text: String, target_pid: int) -> void:
-	dm_received.emit(from, text, target_pid)
+func _relay_dm(text: String, from: String, from_pid: int, target_pid: int) -> void:
+	dm_received.emit(text, from, from_pid, target_pid)

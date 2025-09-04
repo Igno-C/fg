@@ -72,22 +72,6 @@ impl BaseMap {
 
         col_array
     }
-
-    // /// Drops all child nodes except for one named 'Entities'
-    // fn drop_graphics(&mut self) {
-    //     for mut child in self.base().get_children().iter_shared() {
-    //         if child.get_name() != "Entities".into() {
-    //             child.queue_free();
-    //         }
-    //     }
-    // }
-
-    // /// Drops the node named 'Entities'
-    // fn drop_entities(&mut self) {
-    //     if let Some(mut enode) = self.base().get_node_or_null("Entities") {
-    //         enode.queue_free();
-    //     }
-    // }
 }
 
 #[derive(Encode, Decode)]
@@ -150,17 +134,6 @@ impl CollisionArray {
     pub fn to_bytes(&self) -> Vec<u8> {
         bitcode::encode(self)
     }
-
-    // pub fn set_from_used_rect(&mut self, rect: &Rect2i) {
-    //     self.topleftx = rect.position.x;
-    //     self.toplefty = rect.position.y;
-    //     self.width = rect.size.x + 1;
-    //     self.height = rect.size.y + 1;
-    //     self.mapsize = self.width * self.height;
-
-    //     self.map = Vec::with_capacity(self.mapsize as usize);
-    //     for _ in 0..self.mapsize as usize {self.map.push(false);}
-    // }
 
     pub fn get_default_spatialhash<I: Eq, T>(&self) -> spatialhash::SpatialHash<I ,T> {
         let topleft = (self.topleftx, self.toplefty);

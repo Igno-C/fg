@@ -19,11 +19,13 @@ func _on_slot_clicked(index: int) -> void:
 	elif held_item_index == -2:
 		var event = GenericEvent.equip_item(index)
 		ServerNode.send_event(event)
+		swap_eq_and_index(index)
 		stop_holding_item()
 	else:
 		if held_item_index != index:
 			var event = GenericEvent.swap_items(held_item_index, index)
 			ServerNode.send_event(event)
+		swap_held_and_index(index)
 		stop_holding_item()
 
 func _on_equipped_clicked(_this_is_minustwo: int) -> void:
@@ -34,7 +36,20 @@ func _on_equipped_clicked(_this_is_minustwo: int) -> void:
 	else:
 		var event = GenericEvent.equip_item(held_item_index)
 		ServerNode.send_event(event)
+		swap_eq_and_index(held_item_index)
 		stop_holding_item()
+
+func swap_eq_and_index(index: int) -> void:
+	var eq_item = equipped_item.item_resource
+	var held_item = item_nodes[index].item_resource
+	item_nodes[index].set_item(eq_item)
+	equipped_item.set_item(held_item)
+
+func swap_held_and_index(index: int) -> void:
+	var other_item = item_nodes[index].item_resource
+	var held_item = item_nodes[held_item_index].item_resource
+	item_nodes[held_item_index].set_item(other_item)
+	item_nodes[index].set_item(held_item)
 
 func start_holding_item(index: int) -> void:
 	if held_item_index == -1:

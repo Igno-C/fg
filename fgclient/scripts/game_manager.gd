@@ -51,7 +51,14 @@ func _on_player_update(x: int, y: int, speed: int, data_version: int, pid: int) 
 		player_controller.receive_move(x, y, speed)
 	else:
 		p.move(Vector2i(x, y), speed)
-	
+
+func handle_data_version(data_version: int, pid: int) -> void:
+	var p: PlayerEntity = players.get(pid)
+	if p != null:
+		if p.data_version < data_version:
+			ServerNode.send_data_request(pid)
+			p.data_version = data_version
+
 func _on_data_update(data: PlayerContainer) -> void:
 	var pid = data.get_pid()
 	print("pid %s got pdata" % pid)
@@ -118,6 +125,9 @@ func _on_generic_response(response: GenericResponse) -> void:
 		GenericResponse.RESPONSE_DESPAWN_PLAYER:
 			var resp = response.as_despawn_player()
 			despawn_player(resp)
+		GenericResponse.RESPONSE_DATA_UPDATE:
+			var resp = response.as_data_update()
+			handle_data_version(resp["data_version"], resp["pid"])
 
 func load_map(mapname: String):
 	if map != null: map.queue_free()
@@ -197,6 +207,7 @@ func open_context_at(pos: Vector2i) -> void:
 	context_menu.players = players_at
 	context_menu.related_pos = pos
 	context_menu.player_pid = player_pid
+	context_menu.friends = player_friends
 	set_context_menu.emit(context_menu)
 
 func interact_with_entity(entity: GenericEntity) -> void:

@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use godot::{classes::{FileAccess, ResourceLoader}, prelude::*};
 use crate::eventqueue::{EQueue, ServerEvent, GameEvent};
-use rgdext_shared::{basemap::{spatialhash::SpatialHash, CollisionArray}, genericevent::{GenericPlayerEvent, GenericServerResponse}, playerdata::MAX_ITEMS};
+use rgdext_shared::{basemap::{spatialhash::SpatialHash, CollisionArray}, genericevent::{GenericPlayerEvent, GenericServerResponse}, playerdata::{skills::Skill, MAX_ITEMS}};
 use player::Player; use entity::{Entities, GenericScriptedEntity, ResponseType, ScriptResponse};
 
 pub mod player;
@@ -86,15 +86,26 @@ impl INode for Instance {
             let mut p = p.borrow_mut();
             // Broadcasting movement responses from just moved or spawned player to adjacent players
             // 0 ticks since last move means a move just happened
-            if p.ticks_since_move == 0 || p.data_just_updated {
+            if p.ticks_since_move == 0 {
                 let (x, y, speed) = p.get_full_pos();
-                
+
                 self.spatial_hash.for_each_adjacent((x, y), |adjacent| {
                     self.equeue.push_server(
                         ServerEvent::PlayerMoveResponse{x, y, speed, pid: p.pid(), data_version: p.data_version(), net_id: adjacent.0}
                     );
                 });
+            }
 
+            if p.data_just_updated {
+                let (x, y) = p.get_pos();
+                let response = GenericServerResponse::DataUpdate{pid: p.pid(), data_version: p.data_version()}.to_bytearray();
+                
+                self.spatial_hash.for_each_adjacent((x, y), |adjacent| {
+                    self.equeue.push_server(
+                        ServerEvent::GenericResponse{response: response.clone(), net_id: adjacent.0}
+                    );
+                });
+                
                 p.data_just_updated = false;
             }
 
@@ -295,7 +306,7 @@ impl Instance {
                 self.equeue.push_game(GameEvent::PlayerJoinInstance{mapname: mapname.to_string(), x: *x, y: *y, net_id: *net_id});
             },
             ResponseType::MovePlayer{x, y, speed, net_id} => {
-                if let Some(player) = self.players.get_mut(net_id) {
+                if let Some(player) = self.players.get(net_id) {
                     player.borrow_mut().set_full_pos(*x, *y, *speed);
                 }
             },
@@ -309,7 +320,7 @@ impl Instance {
                 self.entities.get_visible_hash_mut().update_pos(b.entity_id, oldpos, newpos);
             },
             ResponseType::GiveItem{item, net_id} => {
-                if let Some(player) = self.players.get_mut(net_id) {
+                if let Some(player) = self.players.get(net_id) {
                     let mut b = player.borrow_mut();
                     if b.data.insert_item(item.bind().to_item()) {
                         b.set_private_change();
@@ -317,6 +328,42 @@ impl Instance {
                     else {
                         godot_print!("Player had full inventory while trying to insert item");
                     }
+                }
+            },
+            ResponseType::GiveXp{skill, amount, net_id} => {
+                if let Some(player) = self.players.get(net_id) {
+                    let skillstr = String::from(skill);
+                    if let Some(skill) = Skill::try_from_str(&skillstr) {
+                        let mut b = player.borrow_mut();
+                        let level_delta = b.data.add_xp(skill, *amount);
+                        if level_delta > 0 {
+                            b.set_public_change();
+                        }
+                        else {
+                            b.set_private_change();
+                        }
+                    }
+                }
+            },
+            ResponseType::TakeItem{id_string, amount, net_id} => {
+                if let Some(player) = self.players.get(net_id) {
+                    let id_str = String::from(id_string);
+                    let mut b = player.borrow_mut();
+                    
+                    if b.data.remove_item(&id_str, *amount) {
+                        b.set_private_change();
+                    }
+                    else {
+                        godot_print!("Couldn't take item");
+                    }
+                }
+            },
+            ResponseType::ChangeGold{amount, net_id} => {
+                if let Some(player) = self.players.get(net_id) {
+                    let mut b = player.borrow_mut();
+                    
+                    b.data.gold += *amount;
+                    b.set_private_change();
                 }
             },
             ResponseType::DespawnSelf{} => {
@@ -330,7 +377,7 @@ impl Instance {
             },
             ResponseType::RegisterEntity{entity} => {self.entities.register_entity(entity.clone());}
             ResponseType::SystemChatMessage{text, net_id} => {
-                self.equeue.push_server(ServerEvent::PlayerChat{from: "".into(), text: text.clone(), is_dm: false, net_id: *net_id});
+                self.equeue.push_server(ServerEvent::PlayerChat{text: text.clone(), from: "".into(), from_pid: -1, is_dm: false, net_id: *net_id});
             }
             ResponseType::Null => {},
         }
@@ -359,7 +406,7 @@ impl Instance {
                 }
                 else {
                     self.equeue.push_server(
-                        ServerEvent::PlayerChat{from: "".into(), text: "Too far!".into(), is_dm: false, net_id}
+                        ServerEvent::PlayerChat{text: "Too far!".into(), from: "".into(), from_pid: -1, is_dm: false, net_id}
                     );
                 }
             }
@@ -409,22 +456,23 @@ impl Instance {
 
     pub fn broadcast_chat(&mut self, text: GString, target_pid: i32, net_id: i32) {
         if let Some(player) = self.players.get(&net_id) {
-            let from = GString::from(&player.borrow().data.name);
+            let b = player.borrow();
+            let from = GString::from(&b.data.name);
 
             // Target pid -1 means broadcast to all
             if target_pid == -1 {
                 for target_net_id in self.players.keys() {
                     self.equeue.push_server(
-                        ServerEvent::PlayerChat{from: from.clone(), text: text.clone(), is_dm: false, net_id: *target_net_id}
+                        ServerEvent::PlayerChat{text: text.clone(), from: from.clone(), from_pid: b.pid(),is_dm: false, net_id: *target_net_id}
                     );
                 }
             }
             else {
+                if player.borrow().pid() == target_pid {
+                    return;
+                }
                 self.equeue.push_game(
-                    GameEvent::PlayerDm{from: from.clone(), text: text.clone(), target_pid}
-                );
-                self.equeue.push_server(
-                    ServerEvent::PlayerChat{from, text, is_dm: true, net_id}
+                    GameEvent::PlayerDm{text: text.clone(), from, from_pid: b.pid(), target_pid}
                 );
             }
         }

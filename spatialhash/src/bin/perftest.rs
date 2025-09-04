@@ -1,175 +1,186 @@
+use rand::{random_range, seq::SliceRandom};
+use spatialhash::{benchmark::*, spatialhash::SpatialHash, LazyChecker, TestObject};
 use std::{cell::RefCell, rc::Rc};
 
-use rand::{Rng, SeedableRng, rngs::StdRng};
-use spatialhash::{*, benchmark::benchmark};
+const NUMBER_OF_REPEATS_FOR_AVG: usize = 200;
 
-
-struct TestObject {
-    pos: (i32, i32),
-    id: i32,
-}
-
-impl TestObject {
-    fn new(x: i32, y: i32, id: i32) -> TestObject {
-        TestObject {
-            pos: (x, y),
-            id
-        }
-    }
-}
-
-impl Positioned for TestObject {
-    fn get_pos(&self) -> (i32, i32) {
-        self.pos
-    }
-}
-
-impl Positionable for TestObject {
-    fn set_pos(&mut self, x: i32, y: i32) {
-        self.pos = (x, y)
-    }
-}
 
 fn main() {
-    full_spatial_benchmark(
-        100,
-        100,
-        200,
-        30,
-        1
-    );
-
-    full_spatial_benchmark(
-        1000,
-        1000,
-        200,
-        30,
-        2
-    );
-
-    full_spatial_benchmark(
-        500,
-        500,
-        50,
-        30,
-        3
-    );
+    let comp1 = Comparison {
+        lazy_check_distance: 25,
+        hash_grid_size: 25,
+        hash_check_radius: 1,
+        num_objects: 100,
+        num_checks: 1000,
+        check_area: 100,
+    };
+    comp1.run();
 }
 
+struct Comparison {
+    pub lazy_check_distance: i32,
+    pub hash_grid_size: i32,
+    pub hash_check_radius: i32,
 
-fn full_spatial_benchmark(num_objects: usize, num_checks: usize, check_size: i32, max_distance: i32, seed: u64) {
-    println!("\n# Max distance {}, {} objects, seeded random uniform distribution, {}x{} map:", max_distance, num_objects, check_size, check_size);
-    let spawn_positions = generate_uniform_id(num_objects, check_size, seed);
-    let swap_positions = generate_uniform(num_objects, check_size, seed+50000);
-    let check_positions = generate_uniform(num_checks, check_size, seed+1000000000);
-    
-    let mut lazy = LazyChecker::new(max_distance);
-    let mut field1 = SpatialHash::new(max_distance, (-check_size/2, -check_size/2), (check_size/2 - 1, check_size/2 - 1), 1);
-    let mut field2 = SpatialHash::new(max_distance/2, (-check_size/2, -check_size/2), (check_size/2 - 1, check_size/2 - 1), 2);
-    let mut field3 = SpatialHash::new(max_distance/3, (-check_size/2, -check_size/2), (check_size/2 - 1, check_size/2 - 1), 3);
+    pub num_objects: usize,
+    pub num_checks: usize,
+    pub check_area: i32
+}
 
-    benchmark("Lazy object insertion", || {
-        for pos in spawn_positions.iter() {
-            lazy.insert(TestObject::new(pos.0, pos.1, pos.2));
-        }
-    });
-    benchmark("Field object insertion", || {
-        for pos in spawn_positions.iter() {
-            field1.insert(pos.2, (pos.0, pos.1));
-        }
-    });
-    for pos in spawn_positions.iter() {
-        field2.insert(pos.2, (pos.0, pos.1));
-        field3.insert(pos.2, (pos.0, pos.1));
-    }
+impl Comparison {
+    fn run(self) {
+        let Comparison {
+            lazy_check_distance,
+            hash_grid_size,
+            hash_check_radius,
+        
+            num_objects,
+            num_checks,
+            check_area
+        } = self;
 
-    benchmark(format!("Lazy distance checking"), || {
-        for check_pos in check_positions.iter() {
-            for adjacent in lazy.get_adjacent(*check_pos) {
-                std::hint::black_box(adjacent);
+        let base_spatial_hash: SpatialHash<i32, Rc<RefCell<TestObject>>> = SpatialHash::new(
+            hash_grid_size,
+            (-check_area, -check_area),
+            (check_area, check_area),
+            hash_check_radius
+        );
+
+        println!("Benchmark with a check distance of {lazy_check_distance} (or {hash_grid_size}x{hash_check_radius})");
+        
+        println!("{num_objects} objects, {num_checks} checks in square area of (-{check_area}, -{check_area}) to ({check_area}, {check_area}):\n");
+
+
+
+        println!("\nLazy checker insertion:");
+        benchmark_avg(|| {
+            let data = generate_data(num_objects, check_area);
+            let lazy_checker = LazyChecker::new(lazy_check_distance);
+            (data, lazy_checker)
+        }, |(data, mut lazy_checker)| {
+            for (id, object) in data.into_iter() {
+                lazy_checker.insert(id, object);
             }
-        }
-    });
-    let mut checked_num = 0;
-    for check_pos in check_positions.iter() {
-        for _adjacent in lazy.get_adjacent(*check_pos) {
-            checked_num+=1;
-        }
-    }
-    println!("Checked {} positions", checked_num);
+            std::hint::black_box(lazy_checker);
+        }, NUMBER_OF_REPEATS_FOR_AVG);
+        
+        println!("\nSpatial hash insertion:");
+        benchmark_avg(|| {
+            let data = generate_data(num_objects, check_area);
+            let spatial_hash = base_spatial_hash.clone();
+            (data, spatial_hash)
+        }, |(data, mut spatial_hash)| {
+            for (id, object) in data.into_iter() {
+                let pos = object.borrow().pos;
+                spatial_hash.insert(id, object, pos);
+            }
+            std::hint::black_box(spatial_hash);
+        }, NUMBER_OF_REPEATS_FOR_AVG);
 
-    benchmark(format!("Field distance checking"), || {
-        for check_pos in check_positions.iter() {
-            field1.for_each_adjacent(*check_pos, |adjacent| {
-                std::hint::black_box(adjacent);
-            });
-        }
-    });
-    let mut checked_num = 0;
-    for check_pos in check_positions.iter() {
-        field1.for_each_adjacent(*check_pos, |_adjacent| {
-            checked_num += 1;
-        });
-    }
-    println!("Checked {} positions", checked_num);
+        println!("\nLazy checker adjacency checks:");
+        let mut lazy_check_count = 0;
+        benchmark_avg(|| {
+            let data = generate_data(num_objects, check_area);
+            let check_positions = generate_positions(num_checks, check_area);
+            let mut lazy_checker = LazyChecker::new(lazy_check_distance);
+            for (id, object) in data.into_iter() {
+                lazy_checker.insert(id, object);
+            }
+            (lazy_checker, check_positions)
+        }, |(lazy_checker, check_positions)| {
+            for pos in check_positions.into_iter() {
+                lazy_checker.get_adjacent(pos).for_each(|o| {
+                    std::hint::black_box(o);
+                    lazy_check_count += 1;
+                });
+            }
+        }, NUMBER_OF_REPEATS_FOR_AVG);
+        println!("Average amount of adjacencies per check set: {}", lazy_check_count / NUMBER_OF_REPEATS_FOR_AVG);
 
-    benchmark(format!("Field with 2-wide distance checking"), || {
-        for check_pos in check_positions.iter() {
-            field2.for_each_adjacent(*check_pos, |adjacent| {
-                std::hint::black_box(adjacent);
-            });
-        }
-    });
-    let mut checked_num = 0;
-    for check_pos in check_positions.iter() {
-        field2.for_each_adjacent(*check_pos, |_adjacent| {
-            checked_num += 1;
-        });
-    }
-    println!("Checked {} positions", checked_num);
+        println!("\nSpatial hash adjacency check:");
+        let mut hash_check_count = 0;
+        benchmark_avg(|| {
+            let data = generate_data(num_objects, check_area);
+            let check_positions = generate_positions(num_checks, check_area);
+            let mut spatial_hash = base_spatial_hash.clone();
+            for (id, object) in data.into_iter() {
+                let pos = object.borrow().pos;
+                spatial_hash.insert(id, object, pos);
+            }
+            (spatial_hash, check_positions)
+        }, |(spatial_hash, check_positions)| {
+            for pos in check_positions.into_iter() {
+                spatial_hash.for_each_adjacent(pos, |o| {
+                    std::hint::black_box(o);
+                    hash_check_count += 1;
+                });
+            }
+        }, NUMBER_OF_REPEATS_FOR_AVG);
+        println!("Average amount of adjacencies per check set: {}", hash_check_count / NUMBER_OF_REPEATS_FOR_AVG);
 
-    benchmark(format!("Field with 3-wide distance checking"), || {
-        for check_pos in check_positions.iter() {
-            field3.for_each_adjacent(*check_pos, |adjacent| {
-                std::hint::black_box(adjacent);
-            });
-        }
-    });
-    let mut checked_num = 0;
-    for check_pos in check_positions.iter() {
-        field3.for_each_adjacent(*check_pos, |_adjacent| {
-            checked_num += 1;
-        });
-    }
-    println!("Checked {} positions", checked_num);
+        println!("\nLazy checker adjacency checks:");
+        let mut lazy_check_count = 0;
+        benchmark_avg(|| {
+            let data = generate_data(num_objects, check_area);
+            let check_positions = generate_positions(num_checks, check_area);
+            let mut lazy_checker = LazyChecker::new(lazy_check_distance);
+            for (id, object) in data.into_iter() {
+                lazy_checker.insert(id, object);
+            }
+            (lazy_checker, check_positions)
+        }, |(lazy_checker, check_positions)| {
+            for pos in check_positions.into_iter() {
+                lazy_checker.get_adjacent(pos).for_each(|o| {
+                    std::hint::black_box(o);
+                    lazy_check_count += 1;
+                });
+            }
+        }, NUMBER_OF_REPEATS_FOR_AVG);
+        println!("Average amount of adjacencies per check set: {}", lazy_check_count / NUMBER_OF_REPEATS_FOR_AVG);
 
-    benchmark("Lazy object moving", || {
-        for (o, pos) in lazy.iter_mut().zip(swap_positions.iter()) {
-            std::hint::black_box(o.set_pos(pos.0, pos.1));
-        }
-    });
-    benchmark("Field object moving", || {
-        for (pos, newpos) in spawn_positions.iter().zip(swap_positions.iter()) {
-            field1.update_pos(pos.2, (pos.0, pos.1), *newpos);
-        }
-    });
+        // Object moving tests
+
+        println!("\nSpatial hash adjacency check:");
+        let mut hash_check_count = 0;
+        benchmark_avg(|| {
+            let data = generate_data(num_objects, check_area);
+            let check_positions = generate_positions(num_checks, check_area);
+            let mut spatial_hash = base_spatial_hash.clone();
+            for (id, object) in data.into_iter() {
+                let pos = object.borrow().pos;
+                spatial_hash.insert(id, object, pos);
+            }
+            (spatial_hash, check_positions)
+        }, |(spatial_hash, check_positions)| {
+            for pos in check_positions.into_iter() {
+                spatial_hash.for_each_adjacent(pos, |o| {
+                    std::hint::black_box(o);
+                    hash_check_count += 1;
+                });
+            }
+        }, NUMBER_OF_REPEATS_FOR_AVG);
+        println!("Average amount of adjacencies per check set: {}", hash_check_count / NUMBER_OF_REPEATS_FOR_AVG);
+    }
 }
 
-// fn field_benchmark()
+fn generate_data(how_many: usize, range: i32) -> Vec<(i32, Rc<RefCell<TestObject>>)> {
+    let mut out: Vec<(i32, Rc<RefCell<TestObject>>)> = generate_positions(how_many, range).into_iter().enumerate().map(|(i, pos)| {
+        (i as i32, TestObject::new_rc(pos))
+    }).collect();
 
-fn generate_uniform(length: usize, range: i32, seed: u64) -> Vec<(i32, i32)> {
-    let mut rng = StdRng::seed_from_u64(seed);
-    (0..length)
-        .map(|_| (rng.random_range(-range/2..range/2), rng.random_range(-range/2..range/2)))
-        .collect()
+    out.shuffle(&mut rand::rng());
+
+    out
 }
 
-/// Generates randomly with seed, in range -range..range
-/// 
-/// (x, y, id)
-fn generate_uniform_id(length: usize, range: i32, seed: u64) -> Vec<(i32, i32, i32)> {
-    let mut rng = StdRng::seed_from_u64(seed);
-    (0..length)
-        .map(|_| (rng.random_range(-range/2..range/2), rng.random_range(-range/2..range/2), rng.random()))
-        .collect()
+fn generate_positions(how_many: usize, range: i32) -> Vec<(i32, i32)> {
+    (0..how_many).map(|_| {
+        (random_range(-range..=range), random_range(-range..=range))
+    }).collect()
+}
+
+fn generate_shuffled_indexes(how_many: usize) -> Vec<usize> {
+    let mut v: Vec<usize> = (0..how_many).collect();
+    v.shuffle(&mut rand::rng());
+    v
 }

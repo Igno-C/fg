@@ -1,12 +1,13 @@
 class_name InventoryItem
 extends TextureRect
 
-@onready var item: TextureRect = get_node("Item")
+@onready var item_rect: TextureRect = get_node("Item")
 @onready var item_count: Label = get_node("ItemCount")
 @onready var highlight: ColorRect = get_node("Highlight")
 
 # Sent back in signals
 var index: int
+var item_resource: ItemResource
 
 signal slot_clicked(index: int)
 
@@ -23,12 +24,13 @@ func set_index(i: int) -> void:
 
 func reset_data() -> void:
 	item_count.text = ""
-	item.texture = null
-	item.visible = true
+	item_rect.texture = null
+	item_rect.visible = true
 	tooltip_text = ""
 
 func set_item(item: ItemResource) -> void:
 	reset_data()
+	item_resource = item
 	if item == null:
 		return
 	load_item_icon(item.id_string)
@@ -42,13 +44,13 @@ func load_item_icon(id_string: String) -> void:
 	if texture == null:
 		print("Couldn't find item icon for ", id_string)
 	else:
-		item.texture = texture
+		item_rect.texture = texture
 
 func set_icon_visible(vis: bool) -> void:
-	item.visible = vis
+	item_rect.visible = vis
 
 func get_icon_texture() -> Texture2D:
-	return item.texture
+	return item_rect.texture
 
 func _on_hover() -> void:
 	highlight.visible = true

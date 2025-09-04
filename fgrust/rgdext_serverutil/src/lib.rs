@@ -1,6 +1,7 @@
 use godot::prelude::*;
 
-pub use rgdext_shared::{serverconnector::ServerConnector, playerdata::playercontainer::PlayerContainer};
+extern crate rgdext_shared;
+//pub use rgdext_shared::{serverconnector::ServerConnector, playerdata::playercontainer::PlayerContainer};
 
 struct FGExtensionServerUtil;
 

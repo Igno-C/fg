@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use godot::{classes::ENetMultiplayerPeer, prelude::*};
 use rgdext_shared::genericevent::GenericPlayerEvent;
 use crate::eventqueue::{EQueue, GameEvent, ServerEvent};
@@ -14,9 +16,10 @@ pub struct Server {
     max_players: i32,
     current_players: i32,
 
-    // pending_players: Vec<(i32, f64)>,
     /// (token as bytes, pid, token timeout)
     pending_tokens: Vec<(Vec<u8>, i32, f64)>,
+    /// net_id -> pid
+    pending_joins: BTreeMap<i32, i32>,
 
     tick: i32,
 
@@ -33,8 +36,8 @@ impl INode for Server {
             max_players: -1,
             current_players: 0,
 
-            // pending_players: Vec::new(),
             pending_tokens: Vec::new(),
+            pending_joins: BTreeMap::new(),
 
             tick: 0,
 
@@ -43,37 +46,6 @@ impl INode for Server {
     }
 
     fn ready(&mut self) {
-        // let q = self.base().get_node_as::<EQueueInitializer>("/root/QueueNode");
-        // self.set_equeue(q.bind().shared_queue.clone());
-
-        // Unreliable config for player movement
-        // let move_config: Dictionary = vdict! {
-        //     "rpc_mode": RpcMode::ANY_PEER,
-        //     "transfer_mode": TransferMode::UNRELIABLE_ORDERED,
-        //     "call_local": false,
-        //     "channel": 0
-        // };
-
-        // let data_config: Dictionary = vdict! {
-        //     "rpc_mode": RpcMode::ANY_PEER,
-        //     "transfer_mode": TransferMode::RELIABLE,
-        //     "call_local": false,
-        //     "channel": 1
-        // };
-
-        // let player_event_config: Dictionary = vdict! {
-        //     "rpc_mode": RpcMode::ANY_PEER,
-        //     "transfer_mode": TransferMode::RELIABLE,
-        //     "call_local": false,
-        //     "channel": 2
-        // };
-
-        // self.base_mut().rpc_config("pmove", &Variant::from(move_config));
-
-        // self.base_mut().rpc_config("pdata", &Variant::from(data_config));
-
-        // self.base_mut().rpc_config("pevent", &Variant::from(player_event_config));
-
         let mut multiplayer_peer = ENetMultiplayerPeer::new_gd();
         multiplayer_peer.create_server_ex(self.port).max_clients(self.max_players).done();
 
@@ -115,8 +87,8 @@ impl INode for Server {
                 ServerEvent::PlayerForceDisconnect{net_id} => {
                     self.base().get_multiplayer().unwrap().get_multiplayer_peer().unwrap().disconnect_peer(net_id);
                 },
-                ServerEvent::PlayerChat{from, text, is_dm, net_id} => {
-                    self.base_mut().rpc_id(net_id.into(), "pchat", vslice![from, text, is_dm]);
+                ServerEvent::PlayerChat{text, from, from_pid, is_dm, net_id} => {
+                    self.base_mut().rpc_id(net_id.into(), "pchat", vslice![text, from, from_pid, is_dm]);
                 }
                 ServerEvent::GenericResponse{response, net_id} => {
                     // let data = response.to_bytearray();
@@ -146,25 +118,24 @@ impl Server {
         self.equeue = e;
     }
 
-    #[func]
-    fn from_config(port: i32, max_players: i32) -> Gd<Self> {
-        Gd::from_init_fn(|base| {
-            Self {
-                equeue: EQueue::default(),
+    // #[func]
+    // fn from_config(port: i32, max_players: i32) -> Gd<Self> {
+    //     Gd::from_init_fn(|base| {
+    //         Self {
+    //             equeue: EQueue::default(),
 
-                port,
-                max_players,
-                current_players: 0,
+    //             port,
+    //             max_players,
+    //             current_players: 0,
 
-                // pending_players: Vec::new(),
-                pending_tokens: Vec::new(),
+    //             pending_tokens: Vec::new(),
 
-                tick: 0,
+    //             tick: 0,
 
-                base
-            }
-        })
-    }
+    //             base
+    //         }
+    //     })
+    // }
 
     #[func]
     fn max_players(&self) -> i32 {
@@ -207,9 +178,8 @@ impl Server {
             self.pending_tokens.remove(matched_i);
             self.base().get_multiplayer().unwrap().cast::<godot::classes::SceneMultiplayer>().complete_auth(net_id);
 
-            self.equeue.push_game(
-                GameEvent::PlayerJoined{net_id, pid}
-            );
+            self.pending_joins.insert(net_id, pid);
+            
         }
         else {
             godot_print!("failed");
@@ -220,6 +190,11 @@ impl Server {
     fn peer_connected(&mut self, net_id: i32) {
         godot_print!("connected: {net_id}");
         self.current_players += 1;
+        if let Some(pid) = self.pending_joins.remove(&net_id) {
+            self.equeue.push_game(
+                GameEvent::PlayerJoined{net_id, pid}
+            );
+        }
     }
 
     #[func]

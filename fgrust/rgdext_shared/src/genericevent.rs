@@ -120,17 +120,17 @@ impl GenericResponse {
     #[constant]
     const RESPONSE_GOT_FRIEND_REQUEST: i32 = 1;
     #[constant]
-    const RESPONSE_NEW_FRIEND: i32 = 2;
+    const RESPONSE_DESPAWN_PLAYER: i32 = 2;
     #[constant]
-    const RESPONSE_DESPAWN_PLAYER: i32 = 3;
+    const RESPONSE_DATA_UPDATE: i32 = 3;
 
     #[func]
     pub fn response_type(&self) -> i32 {
         match &self.response {
             GenericServerResponse::LoadMap{mapname: _} => Self::RESPONSE_LOAD_MAP,
             GenericServerResponse::GotFriendRequest{pid: _, name: _} => Self::RESPONSE_GOT_FRIEND_REQUEST,
-            GenericServerResponse::NewFriend{pid: _} => Self::RESPONSE_NEW_FRIEND,
             GenericServerResponse::DespawnPlayer{pid: _} => Self::RESPONSE_DESPAWN_PLAYER,
+            GenericServerResponse::DataUpdate{pid: _, data_version: _} => Self::RESPONSE_DATA_UPDATE,
             GenericServerResponse::Err => Self::RESPONSE_ERR,
         }
     }
@@ -158,10 +158,16 @@ impl GenericResponse {
     }
 
     #[func]
-    fn as_new_friend(&self) -> i32 {
+    /// Returns a dictionary with fields "pid": int and "data_version": int
+    pub fn as_data_update(&self) -> Dictionary {
         match &self.response {
-            GenericServerResponse::NewFriend{pid} => {*pid},
-            _ => -1,
+            GenericServerResponse::DataUpdate{pid, data_version} => {
+                let mut dict = Dictionary::new();
+                dict.set("pid", *pid);
+                dict.set("data_version",  *data_version);
+                dict
+            },
+            _ => Dictionary::new(),
         }
     }
 
@@ -178,8 +184,8 @@ impl GenericResponse {
 pub enum GenericServerResponse {
     LoadMap{mapname: String},
     GotFriendRequest{pid: i32, name: String},
-    NewFriend{pid: i32},
     DespawnPlayer{pid: i32},
+    DataUpdate{pid: i32, data_version: i32},
     Err,
 }
 

@@ -76,7 +76,7 @@ pub enum ServerEvent {
     PlayerDataResponse{data: PackedByteArray, net_id: i32},
     PlayerForceDisconnect{net_id: i32},
     /// If from is empty, will be displayed as a raw text message
-    PlayerChat{from: GString, text: GString, is_dm: bool, net_id: i32},
+    PlayerChat{text: GString, from: GString, from_pid: i32, is_dm: bool, net_id: i32},
 
     EntityMoveResponse{x: i32, y: i32, speed: i32, entity_id: i32, data_version: i32, net_id: i32},
     EntityDataResponse{interactable: bool, walkable: bool, related_scene: GString, data: Dictionary, entity_id: i32, net_id: i32},
@@ -93,7 +93,7 @@ pub enum GameEvent {
     /// You might be asking yourself, could this possibly not be an event? No, because it happens at Instance level, but needs to be handled at GameManager level
     PlayerJoinInstance{mapname: String, x: i32, y: i32, net_id: i32},
     PlayerChat{text: GString, target_pid: i32, net_id: i32},
-    PlayerDm{from: GString, text: GString, target_pid: i32},
+    PlayerDm{text: GString, from: GString, from_pid: i32, target_pid: i32},
     GenericEvent{event: GenericPlayerEvent, net_id: i32},
     /// net_id of the user requesting, pid of the user whose data is requested
     PDataRequest{pid: i32, net_id: i32},
