@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3 uid="uid://gb2e7konvafa"]
+
+[ext_resource type="Texture2D" uid="uid://bymj40nc4h7oj" path="res://graphics/entities/debugnpc.png" id="1_y4sq6"]
+
+[node name="Npc" type="Sprite2D"]
+texture = ExtResource("1_y4sq6")
+centered = false

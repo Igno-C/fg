@@ -42,9 +42,9 @@ func _on_peer_disconnected(user_id) -> void:
 
 func _on_auth_response(net_id: int, pid: int) -> void:
 	if pid != -1:
-		var waiter: GatewayWaiter = waitinglist[net_id]
-		waiter.authenticate(pid)
+		print("Login succeeded for ", net_id, " with pid ", pid)
 		rpc_id(net_id, "log_in", true)
+		waitinglist[net_id].authenticate(pid)
 	else:
 		print("Login failed for ", net_id)
 		rpc_id(net_id, "log_in", false)
@@ -107,3 +107,5 @@ func join_server(server_name: String) -> void:
 	print("Attempting to join user ", net_id, " to server ", server_name)
 	print(params)
 	rpc_id(net_id, "join_server", waiter.pid, params.ip, params.port, params.token)
+	waiter.time = 0.
+	waiter.authenticated = false

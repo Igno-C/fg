@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use godot::{classes::{FileAccess, ResourceLoader}, prelude::*};
 use crate::eventqueue::{EQueue, ServerEvent, GameEvent};
-use rgdext_shared::{basemap::{spatialhash::SpatialHash, CollisionArray}, genericevent::{GenericPlayerEvent, GenericServerResponse}, playerdata::{skills::Skill, MAX_ITEMS}};
+use rgdext_shared::{basemap::{spatialhash::SpatialHash, CollisionArray}, genericevent::{GenericPlayerEvent, GenericServerResponse}, playerdata::{playercontainer::PlayerContainer, skills::Skill, MAX_ITEMS}};
 use player::Player; use entity::{Entities, GenericScriptedEntity, ResponseType, ScriptResponse};
 
 pub mod player;
@@ -161,7 +161,8 @@ impl INode for Instance {
 
                             // Handling walkable entity
                             if let Some(entity) = self.entities.get_walkable_at(nextx, nexty) {
-                                let res = GenericScriptedEntity::on_player_walk(entity.clone(), *net_id);
+                                let container = PlayerContainer::from_data(p.data.clone());
+                                let res = GenericScriptedEntity::on_player_walk(entity.clone(), container, *net_id);
                                 self.deferred_responses.push((entity.clone(), res));
                             }
                         }
@@ -397,8 +398,9 @@ impl Instance {
                 let dist = x.abs_diff(px).max(y.abs_diff(py)) as i32;
     
                 if dist <= 1 {
-                    let item = pb.data.equipped_item.as_ref().map(|i| i.to_resource());
-                    let response = GenericScriptedEntity::on_player_interaction(interactable.clone(), item, net_id);
+                    // let item = pb.data.equipped_item.as_ref().map(|i| i.to_resource());
+                    let container = PlayerContainer::from_data(pb.data.clone());
+                    let response = GenericScriptedEntity::on_player_interaction(interactable.clone(), container, net_id);
                     drop(pb);
                     let interactable = interactable.clone();
         

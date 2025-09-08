@@ -36,13 +36,14 @@ func set_item(item: ItemResource) -> void:
 	load_item_icon(item.id_string)
 	if item.count > 1:
 		item_count.text = str(item.count)
-	tooltip_text = item.description
+	tooltip_text = item.name + "\n" + item.description
 
 func load_item_icon(id_string: String) -> void:
 	var texture: Texture2D = load("res://graphics/icons/%s.png" % id_string)
 	
 	if texture == null:
 		print("Couldn't find item icon for ", id_string)
+		item_rect.texture = load("res://graphics/icons/invalid.png")
 	else:
 		item_rect.texture = texture
 

@@ -52,6 +52,10 @@ impl LazyChecker {
         let index = self.objects.iter().position(|o| o.0 == id).unwrap();
         self.objects.remove(index);
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = &(i32, Rc<RefCell<TestObject>>)> {
+        self.objects.iter()
+    }
 }
 
 fn distance(a: (i32, i32), b: (i32, i32)) -> i32 {

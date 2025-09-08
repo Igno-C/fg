@@ -1,0 +1,6 @@
+[gd_resource type="ItemResource" format=3 uid="uid://2a0uxbum7u44"]
+
+[resource]
+id_string = "fir_wood"
+name = "Fir wood"
+description = "A piece of wood from a fir tree"

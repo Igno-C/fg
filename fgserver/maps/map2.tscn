@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3 uid="uid://cguywwbwlykh2"]
+[gd_scene load_steps=7 format=3 uid="uid://cguywwbwlykh2"]
 
 [ext_resource type="Script" uid="uid://b3ulfsqahp2ls" path="res://entities/generic_instance_portal.gd" id="1_rn5oq"]
 [ext_resource type="Script" uid="uid://bnlpapopcb6wh" path="res://entities/generic_portal_entity.gd" id="2_gc36p"]
-[ext_resource type="Script" uid="uid://coopn626hml2r" path="res://entities/generic_tree.gd" id="3_frp5n"]
-[ext_resource type="Script" uid="uid://b5gfg3va2op1w" path="res://entities/generic_cooldownchest.gd" id="4_yj6n1"]
+[ext_resource type="Script" uid="uid://c7bflugjvo4uh" path="res://entities/generic_tree.gd" id="3_frp5n"]
+[ext_resource type="Script" uid="uid://diyx86gwwrml7" path="res://entities/generic_cooldownchest.gd" id="4_yj6n1"]
 [ext_resource type="ItemResource" uid="uid://ch3mj0fe4w0oq" path="res://items/axe.tres" id="5_pkcb3"]
+[ext_resource type="Script" uid="uid://c2ph882jp1qw6" path="res://entities/debug_npc.gd" id="6_gc36p"]
 
 [node name="Entities" type="Node"]
 
@@ -44,3 +45,8 @@ script = ExtResource("4_yj6n1")
 cooldown = 10.0
 loot = ExtResource("5_pkcb3")
 metadata/_custom_type_script = "uid://diyx86gwwrml7"
+
+[node name="DebugNpc" type="GenericScriptedEntity" parent="."]
+pos = Vector2i(2, 0)
+script = ExtResource("6_gc36p")
+metadata/_custom_type_script = "uid://c2ph882jp1qw6"

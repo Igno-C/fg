@@ -39,6 +39,15 @@ impl PlayerContainer {
         })
     }
 
+    pub fn from_data(data: PlayerData) -> Gd<PlayerContainer> {
+        Gd::from_init_fn(|base| {
+            PlayerContainer {
+                data,
+                base
+            }
+        })
+    }
+
     #[func]
     pub fn to_bytearray(&self) -> PackedByteArray {
         self.data.to_bytearray()

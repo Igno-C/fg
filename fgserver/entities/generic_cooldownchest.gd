@@ -21,7 +21,7 @@ func _process(delta: float) -> void:
 			loot_ready = true
 			set_public_value("open", false)
 
-func _on_player_interaction(with_item: ItemResource, net_id: int) -> ScriptResponse:
+func _on_player_interaction(player: PlayerContainer, net_id: int) -> ScriptResponse:
 	if loot_ready:
 		loot_ready = false
 		set_public_value("open", true)

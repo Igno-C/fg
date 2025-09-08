@@ -5,5 +5,8 @@ extends GenericScriptedEntity
 @export var to_where: Vector2i
 @export var speed: int
 
-func _on_player_walk(net_id: int) -> ScriptResponse:
+func _ready() -> void:
+	walkable = true
+
+func _on_player_walk(player: PlayerContainer, net_id: int) -> ScriptResponse:
 	return ScriptResponse.move_player(to_where.x, to_where.y, speed, net_id)

@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use godot::prelude::*;
-use rgdext_shared::{basemap::spatialhash::SpatialHash, playerdata::item::ItemResource};
+use rgdext_shared::{basemap::spatialhash::SpatialHash, playerdata::{item::ItemResource, playercontainer::PlayerContainer}};
 
-/// Only overrwite on_* virtual methods.
+/// Only overwite on_* virtual methods.
 /// 
 /// If a null response is returned (as by default), no signal will be sent.
 #[derive(GodotClass)]
@@ -98,12 +98,12 @@ impl GenericScriptedEntity {
     }
 
     #[func(gd_self, virtual)]
-    pub fn on_player_walk(this: Gd<Self>, net_id: i32) -> Gd<ScriptResponse> {
+    pub fn on_player_walk(this: Gd<Self>, player: Gd<PlayerContainer>, net_id: i32) -> Gd<ScriptResponse> {
         ScriptResponse::null_response()
     }
 
     #[func(gd_self, virtual)]
-    pub fn on_player_interaction(this: Gd<Self>, with_item: Option<Gd<ItemResource>>, net_id: i32) -> Gd<ScriptResponse> {
+    pub fn on_player_interaction(this: Gd<Self>, player: Gd<PlayerContainer>, net_id: i32) -> Gd<ScriptResponse> {
         ScriptResponse::null_response()
     }
 
