@@ -6,3 +6,4 @@
 cargo build -p rgdext "$@"
 cargo build -p rgdext_client "$@"
 cargo build -p rgdext_serverutil "$@"
+cargo build -p map_benchmark "$@"

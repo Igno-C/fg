@@ -187,6 +187,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "map_benchmark"
+version = "0.1.0"
+dependencies = [
+ "godot",
+ "rgdext_shared",
+]
+
+[[package]]
 name = "markdown"
 version = "1.0.0-alpha.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"

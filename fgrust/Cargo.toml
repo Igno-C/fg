@@ -1,5 +1,5 @@
 [workspace]
-members = ["rgdext", "rgdext_shared", "rgdext_serverutil", "rgdext_client"]
+members = ["rgdext", "rgdext_shared", "rgdext_serverutil", "rgdext_client", "map_benchmark"]
 resolver = "2"
 
 [workspace.dependencies]

@@ -5,8 +5,14 @@ var db := SQLite.new()
 
 const password_query: String = "SELECT password, salt, pid FROM auth WHERE username = ?"
 
+const index_query: String = "CREATE INDEX idx_username ON auth(username)"
 
 func _ready() -> void:
+	var prev_ticks := Time.get_ticks_usec()
+	hash_password("ExamplePassword12345", get_salt())
+	var elapsed = Time.get_ticks_usec() - prev_ticks
+	print("Hashing password takes %s µs" % elapsed)
+	
 	var config := ConfigFile.new()
 	config.load("res://auth.cfg")
 	var port = config.get_value("Auth", "port")
@@ -42,6 +48,8 @@ func create_or_open_db() -> void:
 		
 		if not db.create_table("auth", auth_db_dict):
 			print("Failed to create db table somehow: ", db.error_message)
+		if not db.query(index_query):
+			print("Failed to create username index: ", db.error_message)
 
 func check_with_db(username: String, password: String) -> int:
 	if not db.query_with_bindings(password_query, [username]):

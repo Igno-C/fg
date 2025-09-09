@@ -10,7 +10,7 @@ const lock_query: String = "UPDATE pdata SET lock_id = ? WHERE pid = ?"
 const unlock_all_query: String = "UPDATE pdata SET lock_id = null WHERE lock_id = ?"
 const unlock_absolutely_all_query: String = "UPDATE pdata SET lock_id = null"
 
-#var servers: Dictionary
+const index_query: String = "CREATE INDEX idx_pid ON pdata(pid);"
 
 func _ready() -> void:
 	var config := ConfigFile.new()
@@ -52,6 +52,8 @@ func create_or_open_db() -> void:
 		
 		if not db.create_table("pdata", game_db_dict):
 			print("Failed to create db table somehow: ", db.error_message)
+		if not db.query(index_query):
+			print("Failed to create pid index: ", db.error_message)
 
 func create_new_player(pid: int, username: String) -> void:
 	db.insert_row("pdata", {

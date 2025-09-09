@@ -4,8 +4,8 @@ use godot::{classes::ENetMultiplayerPeer, prelude::*};
 use rgdext_shared::genericevent::GenericPlayerEvent;
 use crate::eventqueue::{EQueue, GameEvent, ServerEvent};
 
-const AUTHENTICATION_TIMEOUT: f64 = 5.;
-const AUTH_TOKEN_TIMEOUT: f64 = 4.5;
+const AUTHENTICATION_TIMEOUT: f64 = 4.;
+const AUTH_TOKEN_TIMEOUT: f64 = 4.;
 
 #[derive(GodotClass)]
 #[class(base=Node)]
