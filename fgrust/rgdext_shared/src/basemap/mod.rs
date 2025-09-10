@@ -49,7 +49,7 @@ impl BaseMap {
         self.col_array.set_at(x, y, to);
     }
 
-    /// Also drops the collision tilemap.
+    /// Drops the collision tilemap if drop_node is true
     pub fn extract_collisions(&mut self, drop_node: bool) -> CollisionArray {
         // CMap is the expected name of the collision tilemap node
         let mut collision_tilemap: Gd<TileMapLayer> = match self.base().try_get_node_as::<TileMapLayer>("CMap") {
@@ -106,6 +106,12 @@ impl CollisionArray {
     //         mapsize: other.mapsize,
     //     }
     // }
+
+    pub fn get_dimensions(&self) -> ((i32, i32), (i32, i32)) {
+        let topleft = (self.topleftx, self.toplefty);
+        let bottomright = (self.topleftx + self.width - 1, self.toplefty + self.height - 1);
+        (topleft, bottomright)
+    }
 
     pub fn from_used_rect(rect: &Rect2i) -> Self {
         let topleftx = rect.position.x;
