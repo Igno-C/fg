@@ -145,7 +145,9 @@ func load_map(mapname: String):
 	for pid: int in players:
 		if pid != player_pid:
 			despawn_player(pid)
-	for entity_id: int in entities:
+	print("Follwing entities getting despawned: ", entities)
+	for entity_id: int in entities.keys():
+		print("Entity ", entity_id)
 		despawn_entity(entity_id)
 	
 	var mapscene: PackedScene = load("res://maps/%s.tscn" % mapname)

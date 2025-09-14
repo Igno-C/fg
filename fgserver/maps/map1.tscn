@@ -6,7 +6,6 @@
 
 [node name="map2portal" type="GenericScriptedEntity" parent="."]
 pos = Vector2i(3, -3)
-walkable = true
 script = ExtResource("1_6gueq")
 mapname = "map2"
 to_where = Vector2i(7, 0)

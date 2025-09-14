@@ -7,6 +7,7 @@ extends GenericScriptedEntity
 
 func _ready() -> void:
 	walkable = true
+	related_scene = "portal"
 
 func _on_player_walk(player: PlayerContainer, net_id: int) -> Array[ScriptResponse]:
 	return [ScriptResponse.move_player(to_where.x, to_where.y, speed, net_id)]
