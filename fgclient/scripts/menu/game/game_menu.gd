@@ -40,11 +40,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("Close"):
 		if context_menu != null:
 			context_menu.queue_free()
-		if player_details.close_all():
+		elif player_details.close_all():
 			big_menu.visible = not big_menu.visible
 
-func _on_friend_data_update(uname: String, server_name: String) -> void:
-	player_details._on_friend_data_update(uname, server_name)
+func _on_friend_data_update(data: PlayerContainer) -> void:
+	player_details._on_friend_data_update(data)
 
 func _on_get_friend_request(pid: int, uname: String) -> void:
 	player_details._on_get_friend_request(pid, uname)

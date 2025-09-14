@@ -4,7 +4,7 @@ use godot::builtin::Rect2i;
 pub const GRID_SIZE: i32 = 8;
 pub const CHECK_RADIUS: i32 = 3;
 
-pub struct SpatialHash<I: Eq, T> {
+pub struct SpatialHash<I: Eq + Copy, T> {
     grid_size: i32,
     topleft: (i32, i32),
     width: usize,
@@ -14,7 +14,7 @@ pub struct SpatialHash<I: Eq, T> {
     map: Vec<Vec<(I, T)>>
 }
 
-impl<I: Eq, T> Default for SpatialHash<I, T> {
+impl<I: Eq + Copy, T> Default for SpatialHash<I, T> {
     fn default() -> Self {
         Self {
             grid_size: 0,
@@ -27,12 +27,12 @@ impl<I: Eq, T> Default for SpatialHash<I, T> {
     }
 }
 
-pub enum MoveDelta {
-    Delta{from: (i32, i32), to: (i32, i32), check_radius: i32},
+pub enum MoveDelta<I: Eq + Copy> {
+    Delta{from: (i32, i32), to: (i32, i32), check_radius: i32, exclude_id: I},
     NoMove
 }
 
-impl<I: Eq, T> SpatialHash<I, T> {
+impl<I: Eq + Copy, T> SpatialHash<I, T> {
     pub fn from_used_rect_default(rect: &Rect2i) -> Self {
         let rect_topleft = (rect.position.x, rect.position.y);
         let rect_bottomright = (rect.end().x, rect.end().y);
@@ -122,7 +122,7 @@ impl<I: Eq, T> SpatialHash<I, T> {
         return None;
     }
 
-    pub fn update_pos<'a>(&'a mut self, id: I, oldpos: (i32, i32), newpos: (i32, i32)) -> MoveDelta {
+    pub fn update_pos<'a>(&'a mut self, id: I, oldpos: (i32, i32), newpos: (i32, i32)) -> MoveDelta<I> {
         let oldsmallpos = self.get_smallpos(oldpos);
         let newsmallpos = self.get_smallpos(newpos);
 
@@ -133,10 +133,10 @@ impl<I: Eq, T> SpatialHash<I, T> {
 
         if let Some(oldi) = oldi_maybe && let Some(newi) = newi_maybe {
             if let Some(remove_index) = self.map[oldi].iter().position(|_id| _id.0 == id) {
-                let id = self.map[oldi].remove(remove_index);
-
-                self.map[newi].push(id);
-                return MoveDelta::Delta{from: oldsmallpos, to: newsmallpos, check_radius: self.check_radius};
+                let object = self.map[oldi].remove(remove_index);
+                let id = object.0;
+                self.map[newi].push(object);
+                return MoveDelta::Delta{from: oldsmallpos, to: newsmallpos, check_radius: self.check_radius, exclude_id: id};
             }
         }
         return MoveDelta::NoMove;
@@ -153,41 +153,22 @@ impl<I: Eq, T> SpatialHash<I, T> {
         return None;
     }
 
-    // pub fn get_by_data<F: Fn(&T) -> bool>(&self, pos: (i32, i32), predicate: F) -> Option<&(I, T)> {
-    //     if let Some(i) = self.smallpos_to_index(self.get_smallpos(pos)) {
-    //         for object in &self.map[i] {
-    //             if predicate(&object.1) {
-    //                 return Some(object)
-    //             }
-    //         }
-    //     }
-    //     return None;
-    // }
+    pub fn get_mut(&mut self, pos: (i32, i32), id: I) -> Option<&mut T> {
+        if let Some(i) = self.smallpos_to_index(self.get_smallpos(pos)) {
+            for object in &mut self.map[i] {
+                if object.0 == id {
+                    return Some(&mut object.1)
+                }
+            }
+        }
+        return None;
+    }
 }
 
-impl MoveDelta {
-    // pub fn for_each_new<F: FnMut(&(I, T)) -> ()>(self, mut closure: F) {
-    //     if let MoveDelta::Delta{hash, from, to} = self {
-    //         let radius = hash.check_radius;
-    //         for xdelta in -radius..=radius {
-    //             for ydelta in -radius..=radius {
-    //                 let checkpos = (to.0 + xdelta, to.1 + ydelta);
-    //                 let from_distance = from.0.abs_diff(checkpos.0).max(from.1.abs_diff(checkpos.1)) as i32;
-    //                 if from_distance > radius {
-    //                     if let Some(index) = hash.smallpos_to_index(checkpos) {
-    //                         for o in hash.map[index].iter() {
-    //                             closure(o);
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-    
-    pub fn for_each_with<'a, I: Eq, T, F: FnMut(&(I, T)) -> ()>(&self, hash: &'a SpatialHash<I, T>, mut closure: F) {
-        let (from, to, radius) = match self {
-            MoveDelta::Delta{from, to, check_radius} => (*from, *to, *check_radius),
+impl<I: Eq + Copy> MoveDelta<I> {
+    pub fn for_each_with<'a, T, F: FnMut(&(I, T)) -> ()>(&self, hash: &'a SpatialHash<I, T>, mut closure: F) {
+        let (from, to, radius, exclude_id) = match self {
+            MoveDelta::Delta{from, to, check_radius, exclude_id} => (*from, *to, *check_radius, *exclude_id),
             MoveDelta::NoMove => return,
         };
 
@@ -198,7 +179,9 @@ impl MoveDelta {
                 if from_distance > radius {
                     if let Some(index) = hash.smallpos_to_index(checkpos) {
                         for o in hash.map[index].iter() {
-                            closure(o);
+                            if o.0 != exclude_id {
+                                closure(o);
+                            }
                         }
                     }
                 }
@@ -211,7 +194,7 @@ impl MoveDelta {
 
 #[cfg(test)]
 mod tests {
-    use super::SpatialHash;
+    use super::*;
     use std::{cell::{RefCell}, rc::Rc};
 
     use crate::playerdata::PlayerData;
@@ -431,5 +414,136 @@ mod tests {
         let index = hash.smallpos_to_index((-2, -2)).unwrap();
         assert_eq!(hash.map[index].len(), 1);
         assert_eq!(hash.map[index][0].0, 42);
+    }
+
+    #[test]
+    fn test_pos_to_index_out_of_bounds() {
+        let hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (31, 31), 3);
+        
+        assert_eq!(hash.pos_to_index((-1, 0)), None);
+        assert_eq!(hash.pos_to_index((0, -1)), None);
+        assert_eq!(hash.pos_to_index((32, 0)), None);
+        assert_eq!(hash.pos_to_index((0, 32)), None);
+    }
+
+    #[test]
+    fn test_get_existing_element() {
+        let mut hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (31, 31), 3);
+        let player_data = create_player_data();
+        
+        hash.insert(42, player_data.clone(), (10, 10));
+        
+        let result = hash.get((10, 10), 42);
+        assert!(result.is_some());
+        
+        let result = hash.get((10, 10), 99);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_update_position_nonexistent_element() {
+        let mut hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (31, 31), 3);
+        
+        let result = hash.update_pos(42, (10, 10), (20, 20));
+        assert!(matches!(result, MoveDelta::NoMove));
+
+        let mut count = 0;
+        result.for_each_with(&hash, |_item| {
+            count += 1;
+        });
+        
+        assert_eq!(count, 0);
+    }
+
+    #[test] 
+    fn test_move_delta_no_move() {
+        let mut hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (31, 31), 1);
+        let player_data = create_player_data();
+        
+        // Insert elements in cells that will be adjacent to the new position
+        hash.insert(1, player_data.clone(), (10, 10));   // Cell (1,1) - should be adjacent to (1,1)
+        hash.insert(2, player_data.clone(), (20, 20));   // Cell (2,2) - should be adjacent to (1,1)  
+        hash.insert(3, player_data, (5, 5));     // Cell (0,0) - should be adjacent to (1,1)
+        
+        // Move from (10, 10) to (15, 15) - same cell
+        let result = hash.update_pos(1, (10, 10), (15, 15));
+        assert!(matches!(result, MoveDelta::NoMove));
+    }
+
+    #[test]
+    fn test_move_delta_some_move() {
+        let mut hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (31, 31), 3);
+        let player_data = create_player_data();
+        
+        // Insert elements in cells that will be adjacent to the new position
+        hash.insert(1, player_data.clone(), (10, 10));   // Cell (1,1) 
+        hash.insert(2, player_data.clone(), (20, 20));   // Cell (2,2) 
+        hash.insert(3, player_data, (5, 5));     // Cell (0,0)
+        
+        // Move from (10, 10) to (25, 25) - different cell (3,3)
+        let delta = hash.update_pos(1, (10, 10), (25, 25));
+        
+        // Should return a Delta since it moved to a different cell
+        match delta {
+            MoveDelta::Delta { from, to, check_radius, exclude_id } => {
+                assert_eq!(from, (1, 1));
+                assert_eq!(to, (3, 3));
+                assert_eq!(check_radius, 3);
+                assert_eq!(exclude_id, 1);
+            }
+            MoveDelta::NoMove => panic!("Expected Delta, got NoMove")
+        }
+    }
+
+    #[test]
+    fn test_move_delta_for_each_with_adjacent_elements() {
+        let mut hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (31, 31), 1);
+        let player_data = create_player_data();
+        
+        hash.insert(1, player_data.clone(), (5, 5));   // Cell (0,0)
+        hash.insert(2, player_data.clone(), (20, 20));   // Cell (2,2)
+        hash.insert(3, player_data, (10, 10));     // Cell (1,1)
+        
+        // Move from (5, 5) to (16, 16) - to different cell (2,2)
+        let delta = hash.update_pos(1, (5, 5), (16, 16));
+        
+        let mut found_ids = Vec::new();
+        delta.for_each_with(&hash, |item| {
+            found_ids.push(item.0);
+        });
+
+        println!("{:?}", found_ids);
+        
+        // Should find only the elements that are now within adjacency range of (2,2) but weren't before
+        // That is - id 2
+        assert_eq!(found_ids.len(), 1);
+        assert_eq!(found_ids[0], 2);
+    }
+
+    #[test]
+    fn test_move_delta_for_each_wide_check_radius() {
+        let mut hash = SpatialHash::<i32, Rc<RefCell<PlayerData>>>::new(8, (0, 0), (60, 60), 3);
+        let player_data = create_player_data();
+        
+        // Insert elements that are NOT in any adjacent cell to new position 
+        hash.insert(1, player_data.clone(), (10, 10));   // Cell (1,1)
+        hash.insert(2, player_data.clone(), (50, 50));   // Cell (6,6)
+        hash.insert(3, player_data.clone(), (32, 32));   // Cell (4,4)
+        hash.insert(4, player_data, (40, 40));   // Cell (5,5)
+        
+        // Move from (10, 10) to (25, 25) - different cell (3,3)
+        let delta = hash.update_pos(1, (10, 10), (25, 25));
+        
+        let mut found_ids = Vec::new();
+        
+        delta.for_each_with(&hash, |item| {
+            found_ids.push(item.0);
+        });
+        
+        // Elements with ids 2 and 4 should enter the adjacency
+        // We do not know the order they will appear though.
+        assert_eq!(found_ids.len(), 2);
+        assert!(found_ids.contains(&2));
+        assert!(found_ids.contains(&4));
     }
 }

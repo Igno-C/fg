@@ -27,6 +27,7 @@ func _on_line_edit_gui_input(event: InputEvent) -> void:
 		if dm_target == -1:
 			is_dming = false
 		set_hint()
+		accept_event()
 
 func set_hint() -> void:
 	if is_dming:
@@ -110,11 +111,11 @@ func _on_chat_send(text: String) -> void:
 	text = text.strip_edges()
 	if text.is_empty():
 		return
-	if dm_target == -1:
-		ServerNode.send_zone_chat(text)
-	else:
+	if is_dming:
 		ServerNode.send_dm(text, dm_target)
 		push_chat_message(text, "To " + dm_username, dm_target, true)
+	else:
+		ServerNode.send_zone_chat(text)
 
 func _on_chat_text_focus(focus: bool) -> void:
 	#chat.scroll_following = not focus

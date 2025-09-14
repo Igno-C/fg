@@ -3,7 +3,10 @@
 [ext_resource type="Texture2D" uid="uid://cnoepaq4ejwnu" path="res://graphics/entities/chest.png" id="1_aqcxu"]
 [ext_resource type="Script" uid="uid://bl7h42mm14t6f" path="res://scripts/entities/chest.gd" id="1_rhrmy"]
 
-[node name="Chest" type="Sprite2D"]
+[node name="GenericEntity" type="Node2D"]
+script = ExtResource("1_rhrmy")
+metadata/_custom_type_script = "uid://d2fofrxgc0e0p"
+
+[node name="Chest" type="Sprite2D" parent="."]
 texture = ExtResource("1_aqcxu")
 centered = false
-script = ExtResource("1_rhrmy")

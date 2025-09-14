@@ -22,6 +22,7 @@ func _ready() -> void:
 		stat_grid.add_child(player_stat_node)
 		player_stat_node.set_skill(skill)
 		skill_nodes[skill] = player_stat_node
+	friends_list.connect("open_details_menu", populate)
 
 func open_friends() -> void:
 	player_stats.visible = false
@@ -33,8 +34,8 @@ func close_all() -> bool:
 	friends_list.visible = false
 	return all_already_closed
 
-func _on_friend_data_update(uname: String, server_name: String) -> void:
-	friends_list._on_friend_data_update(uname, server_name)
+func _on_friend_data_update(data: PlayerContainer) -> void:
+	friends_list._on_friend_data_update(data)
 	#friend_statuses[data.get_name()] = data.get_server_name()
 	#redo_friends_list()
 
@@ -52,6 +53,7 @@ func _on_dm_button_pressed() -> void:
 
 func populate(data: PlayerContainer, show_invite_btn: bool, show_dm_btn: bool) -> void:
 	player_stats.visible = true
+	friends_list.visible = false
 	
 	for skill in PlayerContainer.skill_array():
 		var level = data.get_stat(skill)

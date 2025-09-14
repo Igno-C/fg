@@ -3,8 +3,11 @@
 [ext_resource type="Script" uid="uid://bypg3s6mvnu5f" path="res://scripts/entities/tree.gd" id="1_1c4sr"]
 [ext_resource type="Texture2D" uid="uid://6p0ad6c60icl" path="res://graphics/entities/oak.png" id="1_o8ahq"]
 
-[node name="Tree" type="Sprite2D"]
+[node name="GenericEntity" type="Node2D"]
+script = ExtResource("1_1c4sr")
+metadata/_custom_type_script = "uid://d2fofrxgc0e0p"
+
+[node name="Tree" type="Sprite2D" parent="."]
 texture = ExtResource("1_o8ahq")
 centered = false
 offset = Vector2(0, -25)
-script = ExtResource("1_1c4sr")

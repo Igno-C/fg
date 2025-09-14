@@ -15,11 +15,25 @@ var target: Vector2
 var speed: int
 var currently_moving: bool = false
 
+func _process(delta: float) -> void:
+	if currently_moving:
+		if speed == 0:
+			position = target
+			currently_moving = false
+		else:
+			position = real_lerp(target, position, posmult / speed * delta * 10)
+			
+			if target.distance_squared_to(position) < 0.01:
+				position = target
+				currently_moving = false
+
 # 'by' is the distance that should be travelled
 func real_lerp(to: Vector2, from: Vector2, by: float) -> Vector2:
 	var delta: Vector2 = to - from
 	var deltabs: Vector2 = delta.abs()
 	var maximum: float = maxf(deltabs.x, deltabs.y)
+	if maximum == 0.:
+		return to
 	var movement: Vector2 = (delta / maximum) * by
 	if movement.length_squared() > delta.length_squared():
 		movement = delta
@@ -51,13 +65,3 @@ func get_dir_vec() -> Vector2i:
 			return Vector2i.RIGHT
 		_:
 			return Vector2i.ZERO
-
-func _process(delta: float) -> void:
-	if currently_moving:
-		if speed == 0:
-			position = target
-			currently_moving = false
-		else:
-			position = real_lerp(target, position, posmult / speed * delta * 10)
-			if position == target:
-				currently_moving = false

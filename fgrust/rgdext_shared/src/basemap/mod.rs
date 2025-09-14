@@ -141,7 +141,7 @@ impl CollisionArray {
         bitcode::encode(self)
     }
 
-    pub fn get_default_spatialhash<I: Eq, T>(&self) -> spatialhash::SpatialHash<I ,T> {
+    pub fn get_default_spatialhash<I: Eq + Copy, T>(&self) -> spatialhash::SpatialHash<I ,T> {
         let topleft = (self.topleftx, self.toplefty);
         let bottomright = (topleft.0 + self.width - 1, topleft.1 + self.height -1);
 

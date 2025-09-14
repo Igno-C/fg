@@ -63,7 +63,7 @@ func _on_data_update(data: PlayerContainer) -> void:
 	var pid = data.get_pid()
 	print("pid %s got pdata" % pid)
 	if player_friends.has(pid):
-		got_friend_update.emit(data.get_name(), data.get_server_name())
+		got_friend_update.emit(data)
 	if pid == player_pid:
 		if player_friends.is_empty():
 			player_friends = data.get_friends()
@@ -80,7 +80,7 @@ func _on_entity_update(x: int, y: int, speed: int, data_version: int, entity_id:
 	print("entity %s got update: %s, %s, %s, dataver %s" % [entity_id, x, y, speed, data_version])
 	var e: GenericEntity
 	if not entities.has(entity_id):
-		e = spawn_entity(entity_id)
+		e = spawn_entity(entity_id, "")
 	else:
 		e = entities[entity_id]
 	
@@ -98,17 +98,26 @@ func _on_edata_update(
 	entity_id: int
 ) -> void:
 	print("entity_id %s got pdata" % entity_id)
-	if related_scene.is_empty():
-		despawn_entity(entity_id)
-		return
-	var e: GenericEntity
-	if not entities.has(entity_id):
-		spawn_entity(entity_id)
+	#if related_scene.is_empty():
+		#despawn_entity(entity_id)
+		#return
+	var e: GenericEntity = entities[entity_id]
+	
+	if e == null:
+		spawn_entity(entity_id, related_scene)
+	else:
+		if e.get_script().get_global_name() == "GenericEntity" and related_scene != "":
+			print("Replacing temp entity for ", entity_id)
+			var pos = e.pos
+			e.queue_free()
+			e = spawn_entity(entity_id, related_scene)
+			e.move(pos, 0)
+		
 	e = entities[entity_id]
 	
 	e.interactable = interactable
 	e.walkable = walkable
-	e.load_scene(related_scene)
+	#e.load_scene(related_scene)
 	e.receive_data(data)
 
 func _on_generic_response(response: GenericResponse) -> void:
@@ -171,9 +180,15 @@ func despawn_player(pid: int) -> void:
 	players[pid].queue_free()
 	players.erase(pid)
 
-func spawn_entity(entity_id: int) -> GenericEntity:
+func spawn_entity(entity_id: int, related_scene: String) -> GenericEntity:
 	print("Spawning new generic entity for entity id %s" % entity_id)
-	var e: GenericEntity = GenericEntity.new()
+	
+	var e: GenericEntity
+	if related_scene.is_empty():
+		e = GenericEntity.new()
+	else:
+		var packed_scene: PackedScene = load("res://scenes/entities/%s.tscn" % related_scene)
+		e = packed_scene.instantiate()
 	e.entity_id = entity_id
 	entities[entity_id] = e
 	game_node.add_child(e)

@@ -43,7 +43,8 @@ impl INode for Instance {
 
         // Registering registerable entities
         for child in self.entities_node.as_ref().unwrap().get_children().iter_shared() {
-            if let Ok(entity) = child.try_cast::<GenericScriptedEntity>() {
+            if let Ok(mut entity) = child.try_cast::<GenericScriptedEntity>() {
+                entity.connect("entity_response", &Callable::from_object_method(&self.to_gd(), "handle_entity_response"));
                 self.entities.register_entity(entity);
             }
         }
@@ -81,7 +82,8 @@ impl INode for Instance {
             self.handle_entity_response(entity, response);
         }
 
-        // Sending out packets
+        // Sending out packets from players
+        // This is done before ticking movement so that scripts can set ticks_since_last_move to 0 and have it work
         for (net_id, p) in self.players.iter() {
             let mut p = p.borrow_mut();
             // Broadcasting movement responses from just moved or spawned player to adjacent players
@@ -127,9 +129,10 @@ impl INode for Instance {
             if let Some((nextx, nexty, nextspeed)) = *p.peek_next_move() {
                 // godot_print!("Trying move to {}, {} with speed {}", nextx, nexty, nextspeed);
                 if p.ticks_since_move >= nextspeed {
-                    let (x, y, _speed) = p.get_full_pos();
-
-                    if (x - nextx).abs() == 1 || (y - nexty).abs() == 1 {
+                    let (x, y, _prevspeed) = p.get_full_pos();
+                    // Move is valid if it's an adjacent tile, and a speed of 2 or 3
+                    let move_valid = x.abs_diff(nextx) <= 1 && y.abs_diff(nexty) <= 1 && (nextspeed == 2 || nextspeed == 3);
+                    if move_valid {
                         if !col_array.get_at(nextx, nexty) {
                             p.set_full_pos(nextx, nexty, nextspeed);
 
@@ -147,7 +150,7 @@ impl INode for Instance {
                                 });
                             });
                             // And on all entities that just entered their spatial hash adjacency
-                            delta.for_each_with(self.entities.get_visible_hash(), |(entity_id, entity)| {
+                            delta.for_each_with(self.entities.get_hash(), |(entity_id, entity)| {
                                 let b = entity.bind();
                                 self.equeue.push_server(ServerEvent::EntityMoveResponse{
                                     x: b.pos.x,
@@ -162,8 +165,10 @@ impl INode for Instance {
                             // Handling walkable entity
                             if let Some(entity) = self.entities.get_walkable_at(nextx, nexty) {
                                 let container = PlayerContainer::from_data(p.data.clone());
-                                let res = GenericScriptedEntity::on_player_walk(entity.clone(), container, *net_id);
-                                self.deferred_responses.push((entity.clone(), res));
+                                let responses = GenericScriptedEntity::on_player_walk(entity.clone(), container, *net_id);
+                                for response in responses.iter_shared() {
+                                    self.deferred_responses.push((entity.clone(), response));
+                                }
                             }
                         }
                         else {
@@ -176,6 +181,7 @@ impl INode for Instance {
             }
         }
 
+        // Ticking entity movement to send out packets to players
         for entity in self.entities.iter_visibles_mut() {
             let mut e = entity.bind_mut();
             if e.ticks_since_last_move == 0 || e.data_just_updated {
@@ -270,7 +276,7 @@ impl Instance {
             });
         });
         // And initial update about nearby entities
-        self.entities.get_visible_hash().for_each_adjacent(pos, |adjacent| {
+        self.entities.get_hash().for_each_adjacent(pos, |adjacent| {
             let entity_id = adjacent.0;
             let b = adjacent.1.bind();
 
@@ -299,7 +305,6 @@ impl Instance {
         }
     }
 
-    // // Exposed in order to attach signals to it
     #[func]
     fn handle_entity_response(&mut self, mut entity: Gd<GenericScriptedEntity>, response: Gd<ScriptResponse>) {
         match &response.bind().response {
@@ -314,11 +319,19 @@ impl Instance {
             ResponseType::MoveSelf{x, y, speed} => {
                 let mut b = entity.bind_mut();
                 let oldpos = (b.pos.x, b.pos.y);
+                let entity_id = b.entity_id;
+                let walkable = b.walkable;
                 let newpos = (*x, *y);
+
                 b.pos = Vector2i::new(*x, *y);
                 b.last_speed = *speed;
                 b.ticks_since_last_move = 0;
-                self.entities.get_visible_hash_mut().update_pos(b.entity_id, oldpos, newpos);
+                drop(b);
+
+                self.entities.move_entity(oldpos, newpos, entity_id);
+                if walkable {
+                    self.entities.move_walkable(oldpos, newpos);
+                }
             },
             ResponseType::GiveItem{item, net_id} => {
                 if let Some(player) = self.players.get(net_id) {
@@ -384,8 +397,15 @@ impl Instance {
         }
     }
 
+    // #[func]
+    // fn handle_entity_response_deferred(&mut self, entity: Gd<GenericScriptedEntity>, response: Gd<ScriptResponse>) {
+    //     self.deferred_responses.push((entity, response));
+    // }
+
     fn handle_interaction(&mut self, x: i32, y: i32, entity_id: i32, net_id: i32) {
-        if let Some(interactable) = self.entities.get_interactable_at(x, y) {
+        if let Some(interactable) = self.entities.get_at(x, y, entity_id) {
+            if !interactable.bind().interactable {return}
+
             if let Some(player) = self.players.get(&net_id) {
                 let b = interactable.bind();
                 let pb = player.borrow();
@@ -394,17 +414,20 @@ impl Instance {
                     return
                 }
                 let (px, py) = pb.get_pos();
+                let max_dist = b.interactable_distance;
                 drop(b); 
                 let dist = x.abs_diff(px).max(y.abs_diff(py)) as i32;
     
-                if dist <= 1 {
+                if dist <= max_dist {
                     // let item = pb.data.equipped_item.as_ref().map(|i| i.to_resource());
                     let container = PlayerContainer::from_data(pb.data.clone());
-                    let response = GenericScriptedEntity::on_player_interaction(interactable.clone(), container, net_id);
+                    let responses = GenericScriptedEntity::on_player_interaction(interactable.clone(), container, net_id);
                     drop(pb);
                     let interactable = interactable.clone();
         
-                    self.handle_entity_response(interactable, response);
+                    for response in responses.iter_shared() {
+                        self.handle_entity_response(interactable.clone(), response);
+                    }
                 }
                 else {
                     self.equeue.push_server(
@@ -447,7 +470,7 @@ impl Instance {
 
     /// Pushes response with empty dictionary if invalid entity targeted
     pub fn get_entity_data(&self, x: i32, y: i32, entity_id: i32, net_id: i32) {
-        if let Some(entity) = self.entities.get_visible_hash().get((x, y), entity_id) {
+        if let Some(entity) = self.entities.get_hash().get((x, y), entity_id) {
             let (interactable, walkable, related_scene, data) = entity.bind().get_data();
 
             self.equeue.push_server(

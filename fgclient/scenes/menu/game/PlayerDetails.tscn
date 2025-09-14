@@ -153,10 +153,16 @@ layout_mode = 2
 layout_mode = 2
 text = "Friends"
 
-[node name="FriendsList" type="RichTextLabel" parent="FriendsList/MarginContainer/VBox"]
+[node name="FriendsList" type="ScrollContainer" parent="FriendsList/MarginContainer/VBox"]
 layout_mode = 2
 size_flags_vertical = 3
-bbcode_enabled = true
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 2
+
+[node name="FriendsVBox" type="VBoxContainer" parent="FriendsList/MarginContainer/VBox/FriendsList"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 
 [node name="RequestsVBox" type="VBoxContainer" parent="FriendsList/MarginContainer/VBox"]
 visible = false

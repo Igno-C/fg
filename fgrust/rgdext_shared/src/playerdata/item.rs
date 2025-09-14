@@ -44,20 +44,20 @@ impl IResource for ItemResource {
 #[godot_api]
 impl ItemResource {
     pub fn to_item(&self) -> Item {
-        let mut custom_ints = HashMap::new();
-        let mut custom_floats = HashMap::new();
-        let mut custom_strings = HashMap::new();
+        let mut custom_ints = Vec::new();
+        let mut custom_floats = Vec::new();
+        let mut custom_strings = Vec::new();
 
         for (k, v) in self.custom_data.iter_shared() {
             if let Ok(skey) = k.try_to_relaxed::<String>() {
                 if let Ok(ivar) = v.try_to_relaxed::<i32>() {
-                    custom_ints.insert(skey, ivar);
+                    custom_ints.push((skey, ivar));
                 }
                 else if let Ok(fvar) = v.try_to_relaxed::<f32>() {
-                    custom_floats.insert(skey, fvar);
+                    custom_floats.push((skey, fvar));
                 }
                 else if let Ok(svar) = v.try_to_relaxed::<String>() {
-                    custom_strings.insert(skey, svar);
+                    custom_strings.push((skey, svar));
                 }
                 else {
                     godot_error!("Non-string, non-int value in ItemResource!");
@@ -88,9 +88,9 @@ pub struct Item {
     description: String,
     stackable: bool,
     pub count: i32,
-    custom_ints: HashMap<String, i32>,
-    custom_floats: HashMap<String, f32>,
-    custom_strings: HashMap<String, String>,
+    custom_ints: Vec<(String, i32)>,
+    custom_floats: Vec<(String, f32)>,
+    custom_strings: Vec<(String, String)>,
 }
 
 impl Item {
@@ -98,13 +98,13 @@ impl Item {
         let mut custom_data = Dictionary::new();
 
         for (key, value) in &self.custom_ints {
-            custom_data.set(key.clone(), *value);
+            custom_data.set(key.as_str(), *value);
         }
         for (key, value) in &self.custom_floats {
-            custom_data.set(key.clone(), *value);
+            custom_data.set(key.as_str(), *value);
         }
         for (key, value) in &self.custom_strings {
-            custom_data.set(key.clone(), value.clone());
+            custom_data.set(key.as_str(), value.as_str());
         }
 
         Gd::from_init_fn(|a| {

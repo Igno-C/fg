@@ -7,5 +7,5 @@ extends GenericScriptedEntity
 func _ready() -> void:
 	walkable = true
 
-func _on_player_walk(player: PlayerContainer, net_id: int) -> ScriptResponse:
-	return ScriptResponse.move_player_to_map(mapname, to_where.x, to_where.y, net_id)
+func _on_player_walk(player: PlayerContainer, net_id: int) -> Array[ScriptResponse]:
+	return [ScriptResponse.move_player_to_map(mapname, to_where.x, to_where.y, net_id)]

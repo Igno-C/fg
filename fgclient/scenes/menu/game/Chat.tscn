@@ -20,7 +20,7 @@ anchor_bottom = 1.0
 offset_top = -260.0
 offset_right = 380.0
 grow_vertical = 0
-color = Color(0.25098, 0.25098, 0.25098, 0.501961)
+color = Color(0.25098, 0.25098, 0.25098, 0.862745)
 
 [node name="VBox" type="VBoxContainer" parent="ChatBox"]
 layout_mode = 1

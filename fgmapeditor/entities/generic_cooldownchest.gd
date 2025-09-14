@@ -21,11 +21,11 @@ func _process(delta: float) -> void:
 			loot_ready = true
 			set_public_value("open", false)
 
-func _on_player_interaction(player: PlayerContainer, net_id: int) -> ScriptResponse:
+func _on_player_interaction(player: PlayerContainer, net_id: int) -> Array[ScriptResponse]:
 	if loot_ready:
 		loot_ready = false
 		set_public_value("open", true)
 		print("giving loot of ", loot, " to ", net_id)
-		return ScriptResponse.give_item(loot, net_id)
+		return [ScriptResponse.give_item(loot, net_id)]
 	else:
-		return ScriptResponse.null_response()
+		return [ScriptResponse.null_response()]
