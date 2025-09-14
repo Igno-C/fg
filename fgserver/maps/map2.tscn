@@ -44,14 +44,13 @@ loot = ExtResource("5_sswmq")
 metadata/_custom_type_script = "uid://diyx86gwwrml7"
 
 [node name="npc" type="GenericScriptedEntity" parent="."]
-pos = Vector2i(2, 0)
+pos = Vector2i(3, 6)
 script = ExtResource("6_c2y5g")
 metadata/_custom_type_script = "uid://c2ph882jp1qw6"
 
 [node name="raffle" type="GenericScriptedEntity" parent="."]
 pos = Vector2i(12, -44)
 script = ExtResource("7_8674n")
-cooldown = 45.0
 metadata/_custom_type_script = "uid://4oc0tm0uihti"
 
 [node name="lakesign" type="GenericScriptedEntity" parent="."]

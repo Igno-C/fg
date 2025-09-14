@@ -142,7 +142,7 @@ func load_map(mapname: String):
 	if map != null: map.queue_free()
 	
 	print("Loading map: ", mapname)
-	for pid: int in players:
+	for pid: int in players.keys():
 		if pid != player_pid:
 			despawn_player(pid)
 	print("Follwing entities getting despawned: ", entities)
