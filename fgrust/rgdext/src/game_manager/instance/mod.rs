@@ -131,49 +131,57 @@ impl INode for Instance {
                 if p.ticks_since_move >= nextspeed {
                     let (x, y, _prevspeed) = p.get_full_pos();
                     // Move is valid if it's an adjacent tile, and a speed of 2 or 3
-                    let move_valid = x.abs_diff(nextx) <= 1 && y.abs_diff(nexty) <= 1 && (nextspeed == 2 || nextspeed == 3);
+                    let move_valid = x.abs_diff(nextx) <= 1 &&
+                        y.abs_diff(nexty) <= 1 &&
+                        (nextspeed == 2 || nextspeed == 3) &&
+                        !col_array.get_at(nextx, nexty);
                     if move_valid {
-                        if !col_array.get_at(nextx, nexty) {
-                            p.set_full_pos(nextx, nexty, nextspeed);
+                        p.set_full_pos(nextx, nexty, nextspeed);
 
-                            // Updating player on all players that just entered their spatial hash adjacency
-                            let delta = self.spatial_hash.update_pos(*net_id, (x, y), (nextx, nexty));
-                            delta.for_each_with(&self.spatial_hash, |(_other_net_id, pdata)| {
-                                let b = pdata.borrow();
-                                self.equeue.push_server(ServerEvent::PlayerMoveResponse{
-                                    x: b.x(),
-                                    y: b.y(),
-                                    speed: 0,
-                                    pid: b.pid(),
-                                    data_version: b.data_version(),
-                                    net_id: *net_id
-                                });
+                        // Updating player on all players that just entered their spatial hash adjacency
+                        let delta = self.spatial_hash.update_pos(*net_id, (x, y), (nextx, nexty));
+                        delta.for_each_with(&self.spatial_hash, |(_other_net_id, pdata)| {
+                            let b = pdata.borrow();
+                            self.equeue.push_server(ServerEvent::PlayerMoveResponse{
+                                x: b.x(),
+                                y: b.y(),
+                                speed: 0,
+                                pid: b.pid(),
+                                data_version: b.data_version(),
+                                net_id: *net_id
                             });
-                            // And on all entities that just entered their spatial hash adjacency
-                            delta.for_each_with(self.entities.get_hash(), |(entity_id, entity)| {
-                                let b = entity.bind();
-                                self.equeue.push_server(ServerEvent::EntityMoveResponse{
-                                    x: b.pos.x,
-                                    y: b.pos.y,
-                                    speed: 0,
-                                    entity_id: *entity_id,
-                                    data_version: b.public_data_version,
-                                    net_id: *net_id
-                                });
+                        });
+                        // And on all entities that just entered their spatial hash adjacency
+                        delta.for_each_with(self.entities.get_hash(), |(entity_id, entity)| {
+                            let b = entity.bind();
+                            self.equeue.push_server(ServerEvent::EntityMoveResponse{
+                                x: b.pos.x,
+                                y: b.pos.y,
+                                speed: 0,
+                                entity_id: *entity_id,
+                                data_version: b.public_data_version,
+                                net_id: *net_id
                             });
+                        });
 
-                            // Handling walkable entity
-                            if let Some(entity) = self.entities.get_walkable_at(nextx, nexty) {
-                                let container = PlayerContainer::from_data(p.data.clone());
-                                let responses = GenericScriptedEntity::on_player_walk(entity.clone(), container, *net_id);
-                                for response in responses.iter_shared() {
-                                    self.deferred_responses.push((entity.clone(), response));
-                                }
+                        // Handling walkable entity
+                        if let Some(entity) = self.entities.get_walkable_at(nextx, nexty) {
+                            let container = PlayerContainer::from_data(p.data.clone());
+                            let responses = GenericScriptedEntity::on_player_walk(entity.clone(), container, *net_id);
+                            for response in responses.iter_shared() {
+                                self.deferred_responses.push((entity.clone(), response));
                             }
                         }
-                        else {
-                            godot_print!("Move into wall attempt by {}: {}, {}, {}", p.data.name, nextx, nexty, nextspeed);
-                        }
+                    }
+                    else {
+                        self.equeue.push_server(ServerEvent::PlayerMoveResponse{
+                            x: p.x(),
+                            y: p.y(),
+                            speed: 0,
+                            pid: p.pid(),
+                            data_version: p.data_version(),
+                            net_id: *net_id
+                        });
                     }
 
                     p.eat_next_move();
