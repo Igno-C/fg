@@ -49,6 +49,7 @@ func load_item_icon(id_string: String) -> void:
 
 func set_icon_visible(vis: bool) -> void:
 	item_rect.visible = vis
+	item_count.visible = vis
 
 func get_icon_texture() -> Texture2D:
 	return item_rect.texture

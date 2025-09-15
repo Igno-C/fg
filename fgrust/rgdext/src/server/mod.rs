@@ -118,25 +118,6 @@ impl Server {
         self.equeue = e;
     }
 
-    // #[func]
-    // fn from_config(port: i32, max_players: i32) -> Gd<Self> {
-    //     Gd::from_init_fn(|base| {
-    //         Self {
-    //             equeue: EQueue::default(),
-
-    //             port,
-    //             max_players,
-    //             current_players: 0,
-
-    //             pending_tokens: Vec::new(),
-
-    //             tick: 0,
-
-    //             base
-    //         }
-    //     })
-    // }
-
     #[func]
     fn max_players(&self) -> i32 {
         self.max_players
@@ -151,7 +132,6 @@ impl Server {
     fn port(&self) -> i32 {
         self.port
     }
-
 
     #[func]
     fn register_token(&mut self, token: String, pid: i32) {

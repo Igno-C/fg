@@ -5,5 +5,6 @@
 # Fix for this is in the works: https://github.com/rust-lang/cargo/issues/14774
 cargo build -p rgdext "$@"
 cargo build -p rgdext_client "$@"
+cargo build -p rgdext_client --target=x86_64-pc-windows-gnu "$@"
 cargo build -p rgdext_serverutil "$@"
 cargo build -p map_benchmark "$@"

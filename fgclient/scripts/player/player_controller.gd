@@ -18,9 +18,10 @@ var previous_speed: int = 3
 var ticks_since_move: int = 100
 
 var pis = PlayerInputState.new()
+var auto_random_move := false
 
-signal send_move(x: int, y: int, speed: int)
-signal send_event(event: GenericEvent)
+#signal send_move(x: int, y: int, speed: int)
+#signal send_event(event: GenericEvent)
 signal open_context_at(pos: Vector2i)
 signal set_debug_label(text: String)
 
@@ -39,6 +40,13 @@ func _process(_delta:) -> void:
 	
 	if pis.sprint_pressed: next_speed = 2
 	else: next_speed = 3
+	
+	if auto_random_move:
+		var deltax := randi_range(-1, 1)
+		var deltay := randi_range(-1, 1)
+		target.x = player.pos.x + deltax
+		target.y = player.pos.y + deltay
+		next_speed = 2
 	
 	go_to_target = target != player.pos
 	pis.tick()
@@ -61,6 +69,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				var ipos := get_mouse_ipos()
 				open_context_at.emit(ipos)
 				print(ipos)
+	elif event.is_action_pressed("DebugAction"):
+		auto_random_move = not auto_random_move
 	else:
 		pis.take_event(event)
 
@@ -85,14 +95,14 @@ func on_tick() -> void:
 		var nextpos := delta_from_target()
 		# collision checking
 		if !map.get_at(nextpos.x, nextpos.y):
-			send_move.emit(nextpos.x, nextpos.y, next_speed) # To send to server
+			ServerNode.send_move(nextpos.x, nextpos.y, next_speed)
 			predictions.push_back([nextpos, next_speed])
 			if predictions.size() > 5:
 				var s = "Worryingly many predictions: %s" % predictions.size()
 				print(s)
 				set_debug_label.emit(s)
 			else:
-				set_debug_label.emit("")
+				set_debug_label.emit("clear")
 			player.move(nextpos, next_speed) # Visual client-side movement
 			ticks_since_move = 0; previous_speed = next_speed
 			print("sent ", nextpos, ", speed: ", next_speed)

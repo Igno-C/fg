@@ -206,8 +206,6 @@ func spawn_player_controller() -> void:
 	var pc: Script = load("res://scripts/player/player_controller.gd")
 	player_controller = pc.new()
 	player_controller.set_debug_label.connect(set_debug_label.emit)
-	player_controller.send_move.connect(ServerNode.send_move)
-	player_controller.send_event.connect(ServerNode.send_event)
 	player_controller.open_context_at.connect(open_context_at)
 	Ticker.timeout.connect(player_controller.on_tick)
 	game_node.add_child(player_controller)

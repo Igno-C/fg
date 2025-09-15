@@ -52,14 +52,12 @@ func _peer_disconnected(user_id) -> void:
 	servers.erase(user_id)
 
 @rpc("any_peer", "call_remote", "unreliable_ordered", 0)
-func _update(current_players: int, max_players: int, port: int, name: String):
+func _update(current_players: int, max_players: int, port: int, bind_address: String, name: String):
 	var net_id := multiplayer.get_remote_sender_id()
 	var server_stats: ServerStats = servers[net_id]
 	server_stats.current_players = current_players
 	if server_stats.max_players == 0: # Means this must be the first update for this server
-		var mult_peer = multiplayer.multiplayer_peer as ENetMultiplayerPeer
-		var this_peer := mult_peer.get_peer(net_id)
-		server_stats.address = this_peer.get_remote_address()
+		server_stats.address = bind_address
 		server_stats.port = port
 		server_stats.name = name
 		server_stats.max_players = max_players

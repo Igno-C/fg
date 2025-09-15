@@ -5,13 +5,16 @@
 [node name="Main" type="Node"]
 script = ExtResource("1_m8rsx")
 
-[node name="DebugLabel" type="Label" parent="."]
+[node name="Game" type="Node2D" parent="."]
+
+[node name="Ui" type="CanvasLayer" parent="."]
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="DebugLabel" type="Label" parent="CanvasLayer"]
+unique_name_in_owner = true
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-
-[node name="Game" type="Node2D" parent="."]
-
-[node name="Ui" type="CanvasLayer" parent="."]

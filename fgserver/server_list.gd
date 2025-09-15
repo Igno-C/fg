@@ -4,6 +4,7 @@ extends ServerConnector
 const everythismany: int = 60
 var tick: int = 0
 var server_name: String
+var server_public_address: String
 
 @onready var server_node: Server = get_node("/root/ServerNode")
 
@@ -14,6 +15,7 @@ func _ready() -> void:
 	var port: int = config.get_value("ServerList", "port")
 	var auth_token: String = config.get_value("ServerList", "auth_token")
 	server_name = config.get_value("ServerList", "server_name", "unset server name")
+	server_public_address = config.get_value("ServerList", "server_public_address")
 	
 	var game_manager: GameManager = get_node("/root/ManagerNode")
 	game_manager.set_server_name(server_name)
@@ -35,10 +37,11 @@ func _process(_delta: float) -> void:
 			update_gateway()
 
 func update_gateway() -> void:
-	var current_players = server_node.current_players()
-	var max_players = server_node.max_players()
-	var realport = server_node.port()
-	rpc_id(1, "_update", current_players, max_players, realport, server_name)
+	var current_players := server_node.current_players()
+	var max_players := server_node.max_players()
+	var realport := server_node.port()
+	var real_address := server_public_address
+	rpc_id(1, "_update", current_players, max_players, realport, real_address, server_name)
 
 func _on_peer_connected(_net_id: int) -> void:
 	tick = everythismany-1

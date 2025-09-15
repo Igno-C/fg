@@ -1,6 +1,6 @@
 extends Node
 
-@onready var debug_label: Label = get_node("DebugLabel")
+@onready var debug_label: Label = get_node("%DebugLabel")
 @onready var ticker: Timer = get_node("/root/Ticker")
 @onready var game_node: Node2D = get_node("Game")
 @onready var ui_node: CanvasLayer = get_node("Ui")
@@ -65,6 +65,7 @@ func on_tick() -> void:
 	pass
 
 func set_debug_label(text: String) -> void:
-	if text.is_empty():
-		return
-	debug_label.text = text
+	if text == "clear":
+		debug_label.text = ""
+	else:
+		debug_label.text = text
