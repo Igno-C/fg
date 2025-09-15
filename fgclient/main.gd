@@ -9,6 +9,7 @@ extends Node
 @onready var gateway: GatewayServer = get_node("/root/GatewayServer")
 
 var your_pid: int = -1
+var debug_label_time := 0.
 # Dictionary from net_ids to player entities
 
 func _ready() -> void:
@@ -19,6 +20,12 @@ func _ready() -> void:
 	
 	spawn_loginscreen()
 	#_on_connection_success()
+
+func _process(delta: float) -> void:
+	if not debug_label.text.is_empty():
+		debug_label_time += delta
+		if debug_label_time > 15.:
+			debug_label.text = ""
 
 func spawn_loginscreen(with_err: String = "") -> void:
 	var loginscreen: PackedScene = load("uid://bveij4bkswqeh")
@@ -65,7 +72,5 @@ func on_tick() -> void:
 	pass
 
 func set_debug_label(text: String) -> void:
-	if text == "clear":
-		debug_label.text = ""
-	else:
-		debug_label.text = text
+	debug_label.text = text
+	debug_label_time = 0.

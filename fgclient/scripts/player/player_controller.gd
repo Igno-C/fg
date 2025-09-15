@@ -101,8 +101,6 @@ func on_tick() -> void:
 				var s = "Worryingly many predictions: %s" % predictions.size()
 				print(s)
 				set_debug_label.emit(s)
-			else:
-				set_debug_label.emit("clear")
 			player.move(nextpos, next_speed) # Visual client-side movement
 			ticks_since_move = 0; previous_speed = next_speed
 			print("sent ", nextpos, ", speed: ", next_speed)
