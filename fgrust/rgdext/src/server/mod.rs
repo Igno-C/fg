@@ -68,7 +68,7 @@ impl INode for Server {
         self.pending_tokens.retain_mut(|pending_token| {
             pending_token.2 += delta;
             if pending_token.2 > AUTH_TOKEN_TIMEOUT {
-                godot_print!("Token {:?} timed out", pending_token.0);
+                godot_print!("Token for pid {} timed out", pending_token.1);
                 return false;
             }
             return true;
@@ -136,7 +136,7 @@ impl Server {
     #[func]
     fn register_token(&mut self, token: String, pid: i32) {
         let bytes = token.into_bytes();
-        godot_print!("Registered token with bytes {:?}", bytes);
+        godot_print!("Registered token for pid {}", pid);
         self.pending_tokens.push((bytes, pid, 0.));
     }
 
@@ -150,7 +150,7 @@ impl Server {
     // This is the auth_callback
     #[func]
     fn verify_token(&mut self, net_id: i32, token: PackedByteArray) {
-        godot_print!("Verifying token {} from {}", token, net_id);
+        godot_print!("Verifying token from net_id {}", net_id);
         let bytes = token.as_slice();
         if let Some(matched_i) = self.pending_tokens.iter().position(|(t, _, _)| t.eq(bytes)) {
             godot_print!("succeeded");

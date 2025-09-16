@@ -1,3 +1,6 @@
-[gd_scene format=3 uid="uid://c8u3rq31etu8x"]
+[gd_scene load_steps=2 format=3 uid="uid://c8u3rq31etu8x"]
+
+[ext_resource type="Script" uid="uid://cd3cnfuq30tkm" path="res://generate_tls.gd" id="1_ig7tw"]
 
 [node name="Main" type="Node"]
+script = ExtResource("1_ig7tw")

@@ -22,7 +22,13 @@ func _ready() -> void:
 	set_name("auth")
 	set_target_name("gateway")
 	set_token(auth_token)
-	set_server(port, max_gateways)
+	
+	var crypto_key := CryptoKey.new()
+	crypto_key.load("res://certificates/X509_Key.key")
+	var certificate := X509Certificate.new()
+	certificate.load("res://certificates/X509_Certificate.crt")
+	
+	set_server_dtls(port, max_gateways, crypto_key, certificate)
 	
 	start_server()
 	

@@ -16,7 +16,13 @@ func _ready() -> void:
 	var max_users: int = config.get_value("Gateway", "max_users")
 	set_name("gateway")
 	set_target_name("user")
-	set_server(port, max_users)
+	
+	var crypto_key := CryptoKey.new()
+	crypto_key.load("res://certificates/X509_Key.key")
+	var certificate := X509Certificate.new()
+	certificate.load("res://certificates/X509_Certificate.crt")
+	
+	set_server_dtls(port, max_users, crypto_key, certificate)
 	
 	start_server()
 	

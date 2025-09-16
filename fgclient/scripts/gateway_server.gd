@@ -1,6 +1,6 @@
 extends Node
 
-var network = ENetMultiplayerPeer.new()
+var network := ENetMultiplayerPeer.new()
 var ip: String
 var port: int
 
@@ -90,9 +90,22 @@ func start_client() -> void:
 	if waiting:
 		return
 	waiting = true
+	
 	var err := network.create_client(ip, port)
 	if err != OK:
-		print("Encountered other error in gateway: ", err)
+		creation = false
+		username_held = ""
+		password_held = ""
+		other_error.emit(err)
+		return
+	
+	var cert := X509Certificate.new()
+	cert.load("res://certificates/X509_Certificate_Gateway.crt")
+	
+	var tls_options := TLSOptions.client(cert)
+	
+	err = network.host.dtls_client_setup("FGGateway", tls_options)
+	if err != OK:
 		creation = false
 		username_held = ""
 		password_held = ""

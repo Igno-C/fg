@@ -20,7 +20,9 @@ func _ready() -> void:
 	set_target_name("auth")
 	set_token(auth_token)
 	set_auto_reconnect(true)
-	set_client(port, address)
+	var certificate := X509Certificate.new()
+	certificate.load("res://certificates/X509_Certificate_Auth.crt")
+	set_client_dtls_unsafe(port, address, "FGAuth", certificate)
 	
 	start_server()
 

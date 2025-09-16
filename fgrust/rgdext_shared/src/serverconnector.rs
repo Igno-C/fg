@@ -1,16 +1,16 @@
-use godot::{classes::{ENetMultiplayerPeer, SceneMultiplayer}, global::Error, prelude::*};
+use godot::{classes::{CryptoKey, ENetMultiplayerPeer, SceneMultiplayer, TlsOptions, X509Certificate}, global::Error, prelude::*};
 
 
 enum ServerType {
-    Server{port: i32, max_connections: i32},
-    Client{port: i32, address: GString},
+    Server{port: i32, max_connections: i32, tls_options: Option<(Gd<CryptoKey>, Gd<X509Certificate>)>},
+    Client{port: i32, address: GString, tls_options: Option<(GString, Option<Gd<X509Certificate>>)>},
     None
 }
 
 impl ServerType {
     fn is_client(&self) -> bool {
         match self {
-            ServerType::Client{port: _, address: _} => true,
+            ServerType::Client{..} => true,
             _ => false,
         }
     }
@@ -102,16 +102,32 @@ impl ServerConnector {
     fn _start_server(&mut self) {
         let mut peer = ENetMultiplayerPeer::new_gd();
         match &self.server_type {
-            ServerType::Client {port, address} => {
+            ServerType::Client {port, address, tls_options} => {
                 let err = peer.create_client(address, *port);
                 if err != Error::OK && self.log_level >= 1 {
                     godot_print!("Error starting {} client: {:?}", self.name, err);
                 }
+                if let Some(opt) = tls_options {
+                    let tls_options = TlsOptions::client_ex().trusted_chain(opt.1.as_ref()).done().unwrap();
+                    let err = peer.get_host().unwrap().dtls_client_setup_ex(&opt.0).client_options(&tls_options).done();
+                    
+                    if err != Error::OK && self.log_level >= 1 {
+                        godot_print!("Error enabling DTLS encryption on {} client: {:?}", self.name, err);
+                    }
+                }
             },
-            ServerType::Server {port, max_connections} => {
+            ServerType::Server {port, max_connections, tls_options} => {
                 let err = peer.create_server_ex(*port).max_clients(*max_connections).done();
                 if err != Error::OK && self.log_level >= 1 {
                     godot_print!("Error starting {} server: {:?}", self.name, err);
+                }
+
+                if let Some(opt) = tls_options {
+                    let tls_options = TlsOptions::server(&opt.0, &opt.1).unwrap();
+                    let err = peer.get_host().unwrap().dtls_server_setup(&tls_options);
+                    if err != Error::OK && self.log_level >= 1 {
+                        godot_print!("Error enabling DTLS encryption on {} server: {:?}", self.name, err);
+                    }
                 }
             },
             ServerType::None => {godot_error!("Server type unset! Call set_server() or set_client() first!");}
@@ -122,10 +138,10 @@ impl ServerConnector {
 
         if self.log_level >= 1 {
             match &self.server_type {
-                ServerType::Client{port, address} => {
+                ServerType::Client{port, address, ..} => {
                     godot_print!("Started {} client at port {} and address {}", self.name, port, address);
                 },
-                ServerType::Server{port, max_connections: _} => {
+                ServerType::Server{port, ..} => {
                     godot_print!("Started {} server at port {}", self.name, port);
                 },
                 ServerType::None => {}
@@ -155,12 +171,27 @@ impl ServerConnector {
 
     #[func]
     fn set_client(&mut self, port: i32, address: GString) {
-        self.server_type = ServerType::Client{port, address};
+        self.server_type = ServerType::Client{port, address, tls_options: None};
+    }
+
+    #[func]
+    fn set_client_dtls(&mut self, port: i32, address: GString, hostname: GString) {
+        self.server_type = ServerType::Client{port, address, tls_options: Some((hostname, None))};
+    }
+
+    #[func]
+    fn set_client_dtls_unsafe(&mut self, port: i32, address: GString, hostname: GString, x509_cert: Gd<X509Certificate>) {
+        self.server_type = ServerType::Client{port, address, tls_options: Some((hostname, Some(x509_cert)))};
     }
 
     #[func]
     fn set_server(&mut self, port: i32, max_connections: i32) {
-        self.server_type = ServerType::Server{port, max_connections};
+        self.server_type = ServerType::Server{port, max_connections, tls_options: None};
+    }
+
+    #[func]
+    fn set_server_dtls(&mut self, port: i32, max_connections: i32, crypto_key: Gd<CryptoKey>, x509_cert: Gd<X509Certificate>) {
+        self.server_type = ServerType::Server{port, max_connections, tls_options: Some((crypto_key, x509_cert))};
     }
 
     #[func]
@@ -174,6 +205,7 @@ impl ServerConnector {
     }
 
     #[func]
+    /// 0 is no logging, 1 is basic logging, 2 is full logging
     fn set_log_level(&mut self, log_level: i32) {
         self.log_level = log_level;
     }
@@ -182,13 +214,13 @@ impl ServerConnector {
     fn _verify_token(&self, net_id: i32, data: PackedByteArray) {
         let mut mult = self.base().get_multiplayer().unwrap().cast::<SceneMultiplayer>();
         match &self.server_type {
-            ServerType::Client{port: _, address: _} => {
+            ServerType::Client{..} => {
                 if self.log_level >= 2 {
                     godot_print!("Received authentication from {}: {}", self.target_name, data);
                 }
                 mult.complete_auth(net_id);
             },
-            ServerType::Server{port: _, max_connections: _} => {
+            ServerType::Server{..} => {
                 if self.log_level >= 2 {
                     godot_print!("Authenticating token for {} {}", self.target_name, net_id);
                 }
@@ -245,11 +277,11 @@ impl ServerConnector {
 
         if self.log_level >= 2 {
             match &self.server_type {
-                ServerType::Client{port: _, address: _} => {
+                ServerType::Client{..} => {
                     let net_id = self.base().get_multiplayer().unwrap().get_unique_id();
                     godot_print!("Connected to {} as {}", self.target_name, net_id);
                 },
-                ServerType::Server{port: _, max_connections: _} => {
+                ServerType::Server{..} => {
                     godot_print!("Client {} connected to {}", net_id, self.name);
                 },
                 ServerType::None => {}
@@ -263,11 +295,11 @@ impl ServerConnector {
 
         if self.log_level >= 2 {
             match &self.server_type {
-                ServerType::Client{port: _, address: _} => {
+                ServerType::Client{..} => {
                     let net_id = self.base().get_multiplayer().unwrap().get_unique_id();
                     godot_print!("Disonnected from {} as {}", self.target_name, net_id);
                 },
-                ServerType::Server{port: _, max_connections: _} => {
+                ServerType::Server{..} => {
                     godot_print!("Client {} disconnected from {}", net_id, self.name);
                 },
                 ServerType::None => {}
