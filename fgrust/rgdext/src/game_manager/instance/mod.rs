@@ -12,9 +12,6 @@ mod entity;
 #[class(no_init, base=Node)]
 pub struct Instance {
     pub mapname: String,
-    /// Events may only be pushed by instances in process().
-    /// 
-    /// Or in callbacks from children, like handle_entity_response.
     equeue: EQueue,
     
     entities_node: Option<Gd<Node>>,
@@ -246,7 +243,6 @@ impl Instance {
         let entities_node = entities_scene.instantiate().unwrap();
 
         let col_array_data = FileAccess::get_file_as_bytes(&format!("res://maps/{}.col", &self.mapname));
-        godot_print!("{:?}" ,col_array_data);
         let col_array = CollisionArray::from_bytes(col_array_data.as_slice()).unwrap();
         self.col_array = col_array;
         self.spatial_hash = self.col_array.get_default_spatialhash();
@@ -354,6 +350,7 @@ impl Instance {
             },
             ResponseType::GiveXp{skill, amount, net_id} => {
                 if let Some(player) = self.players.get(net_id) {
+                    godot_print!("Attempting to give skill {}, xp: {}", skill, amount);
                     let skillstr = String::from(skill);
                     if let Some(skill) = Skill::try_from_str(&skillstr) {
                         let mut b = player.borrow_mut();

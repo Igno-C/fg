@@ -60,7 +60,7 @@ func populate(data: PlayerContainer, show_invite_btn: bool, show_dm_btn: bool) -
 		var xp = data.get_stat_progress(skill)
 		skill_nodes[skill].set_stats(level, xp)
 	player_name.text = data.get_name()
-	player_name.tooltip_text = "Player id: " + str(data.get_pid())
+	player_name.tooltip_text = "Player ID: " + str(data.get_pid())
 	equipped_slot.set_item(data.get_equipped_item())
 	invite_button.visible = show_invite_btn
 	dm_button.visible = show_dm_btn

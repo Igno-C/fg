@@ -59,6 +59,7 @@ layout_mode = 0
 offset_left = 6.0
 offset_right = 367.0
 offset_bottom = 32.0
+mouse_filter = 1
 theme_override_font_sizes/font_size = 20
 
 [node name="StatsLabel" type="Label" parent="PlayerStats"]

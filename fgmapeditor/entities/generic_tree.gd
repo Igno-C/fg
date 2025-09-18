@@ -27,11 +27,11 @@ func _process(delta: float) -> void:
 
 func _on_player_interaction(player: PlayerContainer, net_id: int) -> Array[ScriptResponse]:
 	if cut_down:
-		return [ScriptResponse.null_response()]
+		return []
 	var eq_item := player.get_equipped_item()
 	if eq_item == null or eq_item.custom_data["tool"] != "axe":
 		return [ScriptResponse.chat_message("You need to equip an axe to cut down a tree.", net_id)]
-	#var woodcutting := player.get_stat("woodcutting")
+	var woodcutting := player.get_stat("woodcutting")
 	var axe_power: int = eq_item.custom_data["power"]
 	var required_power: int
 	var wood_resource: ItemResource
@@ -43,11 +43,13 @@ func _on_player_interaction(player: PlayerContainer, net_id: int) -> Array[Scrip
 		wood_resource = fir_wood
 	
 	if axe_power >= required_power:
-		cut_down = true
-		set_public_value("cut", true)
-		
-		return [
-			ScriptResponse.give_item(wood_resource, net_id),
-			ScriptResponse.give_xp("woodcutting", required_power * 10, net_id)
-		]
+		if woodcutting >= required_power:
+			cut_down = true
+			set_public_value("cut", true)
+			
+			return [
+				ScriptResponse.give_item(wood_resource, net_id),
+				ScriptResponse.give_xp("woodcutting", required_power * 20, net_id)
+			]
+		return [ScriptResponse.chat_message("Your woodcutting level is too low to cut down this tree.", net_id)]
 	return [ScriptResponse.chat_message("Your axe is too weak to cut down this tree.", net_id)]

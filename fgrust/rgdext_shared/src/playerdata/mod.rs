@@ -62,6 +62,19 @@ impl PlayerData {
 
     /// Returns true if item successfully inserted
     pub fn insert_item(&mut self, item: Item) -> bool {
+        match &mut self.equipped_item {
+            Some(existing_item) => {
+                if existing_item.stackable() && existing_item.id_string() == item.id_string() {
+                    existing_item.count += item.count;
+                    return true;
+                }
+            },
+            None => {
+                self.equipped_item = Some(item);
+                return true;
+            },
+        }
+
         for item_slot in self.items.iter_mut() {
             match item_slot {
                 Some(existing_item) => {
@@ -81,8 +94,18 @@ impl PlayerData {
 
     /// Returns true if item and amount successfully removed. Assumes the amount to be removed is valid
     ///
-    /// Also checks equipped slot
+    /// Checks equipped slot first, then goes through inventory
     pub fn remove_item(&mut self, id_string: &str, amount: i32) -> bool {
+        if let Some(item) = self.equipped_item.as_mut() {
+            if item.id_string() == id_string {
+                item.count -= amount;
+                if item.count <= 0 {
+                    self.equipped_item = None;
+                }
+                return true;
+            }
+        }
+        
         for item_slot in &mut self.items {
             if let Some(item) = item_slot.as_mut() {
                 if item.id_string() == id_string {
@@ -94,15 +117,7 @@ impl PlayerData {
                 }
             }
         }
-        if let Some(item) = self.equipped_item.as_mut() {
-            if item.id_string() == id_string {
-                item.count -= amount;
-                if item.count <= 0 {
-                    self.equipped_item = None;
-                }
-                return true;
-            }
-        }
+
         return false;
     }
 
@@ -129,19 +144,21 @@ impl PlayerData {
 
     /// Returns amount of levels gained
     pub fn add_xp(&mut self, skill: Skill, amount: i32) -> i32 {
-        if self.skills[skill] >= 100 {return 0;}
+        let level_before = self.skills[skill];
+        if level_before == 100 {return 0;}
+
         self.skill_progress[skill] += amount;
-        let mut level = self.skills[skill] as i32;
-        while self.skill_progress[skill] > level * level * 100 {
-            level += 1;
+        let mut level_after = level_before as i32;
+        while self.skill_progress[skill] >= level_after * level_after * 100 {
+            level_after += 1;
         }
-        let level_delta = level - self.skills[skill] as i32;
-        if level >= 100 {
+        let level_delta = level_after - level_before as i32;
+        if level_after >= 100 {
             self.skills[skill] = 100;
             self.skill_progress[skill] = 0;
-            return level_delta;
+            return 100 - level_before as i32;
         }
-        self.skills[skill] = level as u8;
+        self.skills[skill] = level_after as u8;
         return level_delta;
     }
 }

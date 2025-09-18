@@ -33,6 +33,6 @@ func _on_player_interaction(player: PlayerContainer, net_id: int) -> Array[Scrip
 		elif loot != null:
 			return [ScriptResponse.give_item(loot, net_id)]
 		else:
-			return [ScriptResponse.null_response()]
+			return []
 	else:
 		return [ScriptResponse.null_response()]

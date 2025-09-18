@@ -40,6 +40,7 @@ func _on_player_update(x: int, y: int, speed: int, data_version: int, pid: int) 
 	var p: PlayerEntity
 	if not players.has(pid):
 		p = spawn_player(pid)
+		speed = 0
 	else:
 		p = players[pid]
 	
@@ -81,6 +82,7 @@ func _on_entity_update(x: int, y: int, speed: int, data_version: int, entity_id:
 	var e: GenericEntity
 	if not entities.has(entity_id):
 		e = spawn_entity(entity_id, "")
+		speed = 0
 	else:
 		e = entities[entity_id]
 	
@@ -97,7 +99,7 @@ func _on_edata_update(
 	data: Dictionary,
 	entity_id: int
 ) -> void:
-	print("entity_id %s got pdata" % entity_id)
+	print("entity_id %s got edata" % entity_id)
 	#if related_scene.is_empty():
 		#despawn_entity(entity_id)
 		#return
