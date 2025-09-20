@@ -1,2 +1,2 @@
-# fg
-Simple, open-source MMO game implementation using Godot and Rust
+# FG
+Simple, open-source MMO game implementation using Godot and Rust.
