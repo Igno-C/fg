@@ -1,0 +1,11 @@
+[gd_resource type="ItemResource" format=3 uid="uid://ch3mj0fe4w0oq"]
+
+[resource]
+id_string = "axe"
+name = "Basic Axe"
+description = "A basic axe to cut down basic trees."
+stackable = false
+custom_data = {
+"power": 1,
+"tool": "axe"
+}

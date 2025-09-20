@@ -1,0 +1,12 @@
+[gd_scene load_steps=2 format=3 uid="uid://qc3ildbbjrc4"]
+
+[ext_resource type="Script" uid="uid://b3ulfsqahp2ls" path="res://entities/generic_instance_portal.gd" id="1_6gueq"]
+
+[node name="Entities" type="Node"]
+
+[node name="map2portal" type="GenericScriptedEntity" parent="."]
+pos = Vector2i(3, -3)
+script = ExtResource("1_6gueq")
+mapname = "map2"
+to_where = Vector2i(7, 0)
+metadata/_custom_type_script = "uid://b3ulfsqahp2ls"

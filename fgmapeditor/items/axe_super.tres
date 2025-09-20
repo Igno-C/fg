@@ -1,0 +1,11 @@
+[gd_resource type="ItemResource" format=3 uid="uid://bj2cw6lyw8qt6"]
+
+[resource]
+id_string = "axe_super"
+name = "Super Axe"
+description = "A powerful axe to cut down powerful trees."
+stackable = false
+custom_data = {
+"power": 2,
+"tool": "axe"
+}

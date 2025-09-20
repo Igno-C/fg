@@ -1,0 +1,39 @@
+[gd_scene load_steps=3 format=3 uid="uid://bt1url4e2ii34"]
+
+[ext_resource type="Texture2D" uid="uid://ca8ta4kviwgts" path="res://graphics/menu/game/slot.png" id="1_2ffmi"]
+[ext_resource type="Script" uid="uid://d0bgkh1caxry1" path="res://scripts/menu/game/inventory_item.gd" id="2_m54dg"]
+
+[node name="Slot" type="TextureRect"]
+offset_right = 36.0
+offset_bottom = 36.0
+texture = ExtResource("1_2ffmi")
+script = ExtResource("2_m54dg")
+
+[node name="Item" type="TextureRect" parent="."]
+layout_mode = 0
+offset_left = 2.0
+offset_top = 2.0
+offset_right = 34.0
+offset_bottom = 34.0
+
+[node name="ItemCount" type="Label" parent="."]
+layout_mode = 0
+offset_top = 20.0
+offset_right = 34.0
+offset_bottom = 36.0
+theme_override_font_sizes/font_size = 11
+horizontal_alignment = 2
+autowrap_mode = 1
+
+[node name="Highlight" type="ColorRect" parent="."]
+visible = false
+layout_mode = 0
+offset_left = 2.0
+offset_top = 2.0
+offset_right = 34.0
+offset_bottom = 34.0
+mouse_filter = 2
+color = Color(1, 1, 1, 0.0588235)
+
+[connection signal="mouse_entered" from="." to="." method="_on_hover"]
+[connection signal="mouse_exited" from="." to="." method="_on_unhover"]
