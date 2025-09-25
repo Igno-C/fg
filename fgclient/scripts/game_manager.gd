@@ -100,9 +100,9 @@ func _on_edata_update(
 	entity_id: int
 ) -> void:
 	print("entity_id %s got edata" % entity_id)
-	#if related_scene.is_empty():
-		#despawn_entity(entity_id)
-		#return
+	if related_scene.is_empty():
+		despawn_entity(entity_id)
+		return
 	var e: GenericEntity = entities[entity_id]
 	
 	if e == null:

@@ -1,0 +1,6 @@
+[gd_resource type="ItemResource" format=3 uid="uid://blfnuhvw2klb2"]
+
+[resource]
+id_string = "fairy"
+name = "Fairy"
+description = "A fairy, caught in the wild"

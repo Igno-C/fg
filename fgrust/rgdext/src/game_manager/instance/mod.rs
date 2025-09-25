@@ -310,8 +310,8 @@ impl Instance {
     }
 
     #[func]
-    fn handle_entity_response(&mut self, mut entity: Gd<GenericScriptedEntity>, response: Gd<ScriptResponse>) {
-        match &response.bind().response {
+    fn handle_entity_response(&mut self, mut entity: Gd<GenericScriptedEntity>, mut response: Gd<ScriptResponse>) {
+        match &mut response.bind_mut().response {
             ResponseType::MovePlayerToMap{mapname, x, y, net_id} => {
                 self.equeue.push_game(GameEvent::PlayerJoinInstance{mapname: mapname.to_string(), x: *x, y: *y, net_id: *net_id});
             },
@@ -351,7 +351,7 @@ impl Instance {
             ResponseType::GiveXp{skill, amount, net_id} => {
                 if let Some(player) = self.players.get(net_id) {
                     godot_print!("Attempting to give skill {}, xp: {}", skill, amount);
-                    let skillstr = String::from(skill);
+                    let skillstr = String::from(&*skill);
                     if let Some(skill) = Skill::try_from_str(&skillstr) {
                         let mut b = player.borrow_mut();
                         let level_delta = b.data.add_xp(skill, *amount);
@@ -366,7 +366,7 @@ impl Instance {
             },
             ResponseType::TakeItem{id_string, amount, net_id} => {
                 if let Some(player) = self.players.get(net_id) {
-                    let id_str = String::from(id_string);
+                    let id_str = String::from(&*id_string);
                     let mut b = player.borrow_mut();
                     
                     if b.data.remove_item(&id_str, *amount) {
@@ -394,7 +394,10 @@ impl Instance {
                 self.deferred_entity_despawns.push((x, y, entity_id));
                 self.entities.remove_entity((x, y), entity_id);
             },
-            ResponseType::RegisterEntity{entity} => {self.entities.register_entity(entity.clone());}
+            ResponseType::RegisterEntity{entity} => {
+                entity.connect("entity_response", &Callable::from_object_method(&self.to_gd(), "handle_entity_response"));
+                self.entities.register_entity(entity.clone());
+            }
             ResponseType::SystemChatMessage{text, net_id} => {
                 self.equeue.push_server(ServerEvent::PlayerChat{text: text.clone(), from: "".into(), from_pid: -1, is_dm: false, net_id: *net_id});
             }
@@ -449,22 +452,62 @@ impl Instance {
                 self.handle_interaction(x, y, entity_id, net_id);
             },
             GenericPlayerEvent::SwapItems{from, to} => {
-                if from < MAX_ITEMS && to < MAX_ITEMS {
-                    if let Some(player) = self.players.get(&net_id) {
-                        let mut b = player.borrow_mut();
-                        b.data.items.swap(from, to);
-                        b.set_private_change();
-                    }   
+                if from >= MAX_ITEMS || to >= MAX_ITEMS {
+                    return;
+                }
+                if let Some(player) = self.players.get(&net_id) {
+                    let mut b = player.borrow_mut();
+                    b.data.items.swap(from, to);
+                    b.set_private_change();
                 }
             }
             GenericPlayerEvent::EquipItem{from} => {
-                if from < MAX_ITEMS {
-                    if let Some(player) = self.players.get(&net_id) {
-                        let mut b = player.borrow_mut();
-                        let d = &mut b.data;
-                        std::mem::swap(&mut d.items[from], &mut d.equipped_item);
-                        b.set_public_change(); // Because equipped items are public
-                    }   
+                if from >= MAX_ITEMS {
+                    return;
+                }
+                if let Some(player) = self.players.get(&net_id) {
+                    let mut b = player.borrow_mut();
+                    let d = &mut b.data;
+                    std::mem::swap(&mut d.items[from], &mut d.equipped_item);
+                    b.set_public_change(); // Because equipped items are public
+                }
+            },
+            GenericPlayerEvent::SplitItem{from, to, new_count} => {
+                if to >= MAX_ITEMS {
+                    return;
+                }
+                if let Some(player) = self.players.get(&net_id) {
+                    let mut b = player.borrow_mut();
+
+                    if b.data.items[to].is_some() {
+                        return;
+                    }
+                    if let Some(from_item) = &mut b.data.items[from] {
+                        let new_item = from_item.try_split(new_count);
+
+                        b.data.items[to] = new_item;
+                        b.set_private_change();
+                    }
+                }
+            },
+            GenericPlayerEvent::DropItem{from} => {
+                if from >= MAX_ITEMS {
+                    return;
+                }
+                if let Some(player) = self.players.get(&net_id) {
+                    let mut b = player.borrow_mut();
+
+                    b.set_private_change();
+                }
+            },
+            GenericPlayerEvent::DropGold{count} => {
+                if let Some(player) = self.players.get(&net_id) {
+                    let mut b = player.borrow_mut();
+                    if b.data.gold < count {
+                        return;
+                    }
+
+                    b.set_private_change();
                 }
             },
             _ => {

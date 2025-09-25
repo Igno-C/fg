@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use godot::prelude::*;
 use bitcode::{Encode, Decode};
 
@@ -79,6 +77,48 @@ impl ItemResource {
             custom_strings
         }
     }
+
+    #[func]
+    /// If successfully combined, returns null.
+    /// 
+    /// Otherwise, returns the other item that was attempted to combine into this one.
+    fn try_combine(&mut self, other: Gd<ItemResource>) -> Option<Gd<ItemResource>> {
+        let ob = other.bind();
+        if self.id_string != ob.id_string || !self.stackable {
+            drop(ob);
+            return Some(other);
+        }
+        else {
+            self.count += ob.count;
+            return None;
+        }
+    }
+
+    #[func]
+    /// If successfully split, returns the newly split item, this item's count is substracted.
+    /// 
+    /// Otherwise, returns null. Can't reduce this item's count to zero.
+    fn try_split(&mut self, new_count: i32) -> Option<Gd<ItemResource>> {
+        if self.count <= new_count || !self.stackable {
+            return None;
+        }
+        else {
+            let split_item: Gd<ItemResource> = Gd::from_init_fn(|base| {
+                ItemResource {
+                    id_string: self.id_string.clone(),
+                    name: self.name.clone(),
+                    description: self.description.clone(),
+                    stackable: self.stackable.clone(),
+                    count: new_count,
+                    custom_data: self.custom_data.clone(),
+                    base
+                }
+            });
+            self.count -= new_count;
+
+            return Some(split_item);
+        }
+    }
 }
 
 #[derive(Clone, Encode, Decode, Debug)]
@@ -127,5 +167,28 @@ impl Item {
 
     pub fn stackable(&self) -> bool {
         self.stackable
+    }
+
+    pub fn try_combine(&mut self, other: Item) -> Option<Item> {
+        if self.id_string != other.id_string || !self.stackable {
+            return Some(other);
+        }
+        else {
+            self.count += other.count;
+            return None;
+        }
+    }
+
+    pub fn try_split(&mut self, new_count: i32) -> Option<Item> {
+        if self.count <= new_count || !self.stackable {
+            return None;
+        }
+        else {
+            let mut split_item = self.clone();
+            split_item.count = new_count;
+            self.count -= new_count;
+
+            return Some(split_item);
+        }
     }
 }

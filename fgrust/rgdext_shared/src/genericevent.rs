@@ -37,6 +37,27 @@ impl GenericEvent {
     }
 
     #[func]
+    fn split_item(from_index: i32, to_index: i32, new_count: i32) -> Gd<Self> {
+        Gd::from_init_fn(|base| {
+            Self{event: GenericPlayerEvent::SplitItem{from: from_index as usize, to: to_index as usize, new_count}, base}
+        })
+    }
+
+    #[func]
+    fn drop_item(from_index: i32) -> Gd<Self> {
+        Gd::from_init_fn(|base| {
+            Self{event: GenericPlayerEvent::DropItem{from: from_index as usize}, base}
+        })
+    }
+
+    #[func]
+    fn drop_gold(count: i32) -> Gd<Self> {
+        Gd::from_init_fn(|base| {
+            Self{event: GenericPlayerEvent::DropGold{count}, base}
+        })
+    }
+
+    #[func]
     fn friend_request(pid: i32) -> Gd<Self> {
         Gd::from_init_fn(|base| {
             Self{event: GenericPlayerEvent::FriendRequest{pid}, base}
@@ -50,13 +71,6 @@ impl GenericEvent {
         })
     }
 
-    // #[func]
-    // fn interaction_with_item(x: i32, y: i32, item_index: i32) -> Gd<Self> {
-    //     Gd::from_init_fn(|base| {
-    //         Self{event: GenericPlayerEvent::Interaction{x, y, item_index: Some(item_index as usize)}, base}
-    //     })
-    // }
-
     #[func]
     pub fn to_bytearray(&self) -> PackedByteArray {
         self.event.to_bytearray()
@@ -68,6 +82,9 @@ pub enum GenericPlayerEvent {
     Interaction{x: i32, y: i32, entity_id: i32},
     SwapItems{from: usize, to: usize},
     EquipItem{from: usize},
+    SplitItem{from: usize, to: usize, new_count: i32},
+    DropItem{from: usize},
+    DropGold{count: i32},
     FriendRequest{pid: i32},
     FriendAccept{pid: i32},
     Err

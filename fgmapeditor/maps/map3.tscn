@@ -1,10 +1,11 @@
-[gd_scene load_steps=8 format=4 uid="uid://bl1wa44bu386p"]
+[gd_scene load_steps=9 format=4 uid="uid://bl1wa44bu386p"]
 
 [ext_resource type="Script" uid="uid://p8len3s3jsus" path="res://maps/base_map.gd" id="1_dgmk8"]
 [ext_resource type="Script" uid="uid://cij457vrjpkyp" path="res://entities/generic_toll_teleport.gd" id="3_ps52c"]
 [ext_resource type="Script" uid="uid://c7bflugjvo4uh" path="res://entities/generic_tree.gd" id="4_csgcl"]
 [ext_resource type="Script" uid="uid://diyx86gwwrml7" path="res://entities/generic_cooldownchest.gd" id="5_2nrsh"]
 [ext_resource type="Script" uid="uid://bt8kimx56k7dk" path="res://entities/grindstone_entity.gd" id="5_pxxju"]
+[ext_resource type="Script" uid="uid://dgd2pw47l6shy" path="res://entities/fairy_spawner_entity.gd" id="6_kvtmt"]
 [ext_resource type="TileSet" uid="uid://db4u7skputgfv" path="res://graphics/tilesets/baseset.tres" id="10_t4kuo"]
 [ext_resource type="TileSet" uid="uid://d4dk6qwdut6ax" path="res://graphics/tilesets/collisionset.tres" id="11_g1wly"]
 
@@ -38,6 +39,11 @@ metadata/_custom_type_script = "uid://c7bflugjvo4uh"
 pos = Vector2i(6, -3)
 script = ExtResource("5_pxxju")
 metadata/_custom_type_script = "uid://bt8kimx56k7dk"
+
+[node name="FairySpawnerEntity" type="GenericScriptedEntity" parent="Entities"]
+pos = Vector2i(7, 1)
+script = ExtResource("6_kvtmt")
+metadata/_custom_type_script = "uid://dgd2pw47l6shy"
 
 [node name="TileMap" type="TileMapLayer" parent="."]
 use_parent_material = true

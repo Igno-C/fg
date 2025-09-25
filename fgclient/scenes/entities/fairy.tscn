@@ -1,0 +1,28 @@
+[gd_scene load_steps=5 format=3 uid="uid://bhh2cqsnytllp"]
+
+[ext_resource type="Script" uid="uid://komggm6xjc0a" path="res://scripts/entities/fairy.gd" id="1_fv1qd"]
+[ext_resource type="Texture2D" uid="uid://bo821y2gi8nd6" path="res://graphics/entities/fairy.png" id="2_fv1qd"]
+[ext_resource type="Texture2D" uid="uid://b61von6j2cdao" path="res://graphics/entities/fairy2.png" id="3_f42cr"]
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_m5jv0"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("2_fv1qd")
+}, {
+"duration": 1.0,
+"texture": ExtResource("3_f42cr")
+}],
+"loop": true,
+"name": &"default",
+"speed": 5.0
+}]
+
+[node name="Fairy" type="Node2D"]
+script = ExtResource("1_fv1qd")
+metadata/_custom_type_script = "uid://d2fofrxgc0e0p"
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
+sprite_frames = SubResource("SpriteFrames_m5jv0")
+frame_progress = 0.320209
+centered = false
